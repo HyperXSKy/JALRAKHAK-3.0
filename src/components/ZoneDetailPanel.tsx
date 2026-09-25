@@ -167,12 +167,12 @@ export const ZoneDetailPanel: React.FC<ZoneDetailPanelProps> = ({
             </div>
           </div>
 
-          {/* Real-time Atmospheric Station Sensor Readouts */}
+          {/* Atmospheric readings returned by the configured weather provider */}
           <div className="mt-2.5 p-3 rounded-xl border border-stone-200/80 glass-card text-xs">
             <div className="flex items-center justify-between mb-2">
               <span className="text-[10px] uppercase font-bold text-stone-700 flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-ping inline-block" />
-                Live Meteorological Station Readings
+                Weather Provider Readings
               </span>
               <span className="text-[10px] font-mono text-stone-500">
                 Lat: {zone.center[0].toFixed(2)}°, Lng: {zone.center[1].toFixed(2)}°
@@ -182,25 +182,25 @@ export const ZoneDetailPanel: React.FC<ZoneDetailPanelProps> = ({
               <div className="bg-white/80 p-2 rounded-lg border border-stone-200/70 shadow-2xs">
                 <span className="text-[10px] text-stone-500 block font-medium">Ambient Temp</span>
                 <span className="font-bold text-stone-900 font-mono text-xs">
-                  {zone.weather.temperatureC != null ? `${zone.weather.temperatureC}°C` : '21.4°C'}
+                  {zone.weather.temperatureC != null ? `${zone.weather.temperatureC}°C` : 'Unavailable'}
                 </span>
               </div>
               <div className="bg-white/80 p-2 rounded-lg border border-stone-200/70 shadow-2xs">
                 <span className="text-[10px] text-stone-500 block font-medium">Rel. Humidity</span>
                 <span className="font-bold text-stone-900 font-mono text-xs">
-                  {zone.weather.humidityPercent != null ? `${zone.weather.humidityPercent}%` : '85%'}
+                  {zone.weather.humidityPercent != null ? `${zone.weather.humidityPercent}%` : 'Unavailable'}
                 </span>
               </div>
               <div className="bg-white/80 p-2 rounded-lg border border-stone-200/70 shadow-2xs">
                 <span className="text-[10px] text-stone-500 block font-medium">Wind Speed</span>
                 <span className="font-bold text-stone-900 font-mono text-xs">
-                  {zone.weather.windSpeedKmh != null ? `${zone.weather.windSpeedKmh} km/h` : '12 km/h'}
+                  {zone.weather.windSpeedKmh != null ? `${zone.weather.windSpeedKmh} km/h` : 'Unavailable'}
                 </span>
               </div>
             </div>
             {zone.weather.generationTimeMs != null && (
               <div className="mt-2 flex items-center justify-between text-[10px] text-stone-500 pt-1.5 border-t border-stone-200/60">
-                <span>Source: Open-Meteo Radar / Model API</span>
+                <span>Source: Open-Meteo forecast API</span>
                 <span className="font-mono">Latency: {zone.weather.generationTimeMs}ms</span>
               </div>
             )}

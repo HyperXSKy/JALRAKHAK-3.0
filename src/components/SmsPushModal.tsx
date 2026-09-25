@@ -18,18 +18,11 @@ export const SmsPushModal: React.FC<SmsPushModalProps> = ({
   const [targetZoneId, setTargetZoneId] = useState<string>(
     selectedZone?.id || zones[0]?.id || ''
   );
-  const [phoneNumber, setPhoneNumber] = useState('+91 94350 78210');
+  const [phoneNumber, setPhoneNumber] = useState('+91 00000 00000');
   const [isDispatched, setIsDispatched] = useState(false);
   const [dispatchHistory, setDispatchHistory] = useState<
     { id: string; time: string; zone: string; text: string }[]
-  >([
-    {
-      id: 'sms-init-1',
-      time: '12 mins ago',
-      zone: 'Haflong - Jatinga Valley Corridor',
-      text: 'EMERGENCY: Torrential cloudburst >38mm/h. Evacuate Jatinga valley corridor to Haflong District Sports Stadium.',
-    },
-  ]);
+  >([]);
 
   if (!isOpen) return null;
 
@@ -75,7 +68,7 @@ export const SmsPushModal: React.FC<SmsPushModalProps> = ({
                 Cell Broadcast &amp; SMS Early Warning Simulator
               </h3>
               <p className="text-xs text-stone-500 font-medium">
-                Citizen warning packet delivery via simulated cellular emergency gateways.
+                Demo-only warning packet preview. No SMS or cell broadcast is sent.
               </p>
             </div>
           </div>

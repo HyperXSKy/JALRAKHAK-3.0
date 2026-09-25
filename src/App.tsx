@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { MONITORING_ZONES } from './data/zones';
 import { ZoneWithTelemetry, EarlyWarningAlert, RiskLevel, WeatherRainfallData } from './types';
 import { fetchZoneWeather, fetchLivePointWeather, SimulationScenario } from './services/openMeteo';
+import { fetchBackendDashboard } from './services/backend';
 import { calculateZoneRisk, generateZoneAlert, calculateDistanceKm } from './utils/riskEngine';
 import { TopNav } from './components/TopNav';
 import { AlertBanner } from './components/AlertBanner';
@@ -14,6 +15,30 @@ import { CheckAreaModal } from './components/CheckAreaModal';
 import { AlertsDrawerModal } from './components/AlertsDrawerModal';
 import { LandingPage } from './components/LandingPage';
 import { Map, ListFilter, Activity, RefreshCw } from 'lucide-react';
+
+async function fetchNetworkLocation(): Promise<{ lat: number; lng: number } | null> {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), 5000);
+
+  try {
+    const response = await fetch('https://ipapi.co/json/', { signal: controller.signal });
+    if (!response.ok) return null;
+    const data = await response.json() as { latitude?: number; longitude?: number };
+    if (
+      typeof data.latitude !== 'number' ||
+      typeof data.longitude !== 'number' ||
+      data.latitude < -90 ||
+      data.latitude > 90 ||
+      data.longitude < -180 ||
+      data.longitude > 180
+    ) {
+      return null;
+    }
+    return { lat: data.latitude, lng: data.longitude };
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+}
 
 export default function App() {
   const [currentView, setCurrentView] = useState<'LANDING' | 'DASHBOARD'>('LANDING');
@@ -52,6 +77,24 @@ export default function App() {
   // Load telemetry data for all zones
   const loadData = useCallback(async (scenarioMode: SimulationScenario = 'LIVE') => {
     setIsRefreshing(true);
+    try {
+      const backendPayload = await fetchBackendDashboard(scenarioMode);
+      setIsLiveApi(scenarioMode === 'LIVE' && backendPayload.zones.some((zone) => zone.weather.isLive));
+      setZones(backendPayload.zones);
+      setAlerts(backendPayload.alerts);
+      setLastSyncTime(new Date(backendPayload.generatedAt).toLocaleTimeString());
+      setCountdownSeconds(60);
+      setSelectedZone((prev) => {
+        if (!prev) return backendPayload.zones[0] || null;
+        return backendPayload.zones.find((zone) => zone.id === prev.id) || backendPayload.zones[0] || null;
+      });
+      setIsLoading(false);
+      setIsRefreshing(false);
+      return;
+    } catch (backendError) {
+      console.warn('Hydromet backend unavailable; using browser fallback:', backendError);
+    }
+
     try {
       const results = await Promise.all(
         MONITORING_ZONES.map(async (zone) => {
@@ -122,7 +165,6 @@ export default function App() {
   // Handle Scenario Change
   const handleScenarioChange = (newScenario: SimulationScenario) => {
     setScenario(newScenario);
-    loadData(newScenario);
   };
 
   // Handle Geolocation "Check My Area"
@@ -133,8 +175,8 @@ export default function App() {
     if (!navigator.geolocation) {
       const fallback = zones[0] || MONITORING_ZONES[0];
       setNearestZone(fallback);
-      setDistanceToNearestKm(12.4);
-      setUserCoords({ lat: fallback.center[0] + 0.02, lng: fallback.center[1] + 0.02 });
+      setDistanceToNearestKm(null);
+      setUserCoords(null);
       setGeoError('Geolocation is not supported by your browser environment. Displaying nearest regional sector.');
       setIsLocating(false);
       setIsCheckAreaOpen(true);
@@ -160,8 +202,8 @@ export default function App() {
         ) {
           const fallback = zones[0] || MONITORING_ZONES[0];
           setNearestZone(fallback);
-          setDistanceToNearestKm(12.4);
-          setUserCoords({ lat: fallback.center[0] + 0.02, lng: fallback.center[1] + 0.02 });
+          setDistanceToNearestKm(null);
+          setUserCoords(null);
           setGeoError('GPS signal lacked valid numerical coordinates. Showing proximity to active sector.');
           setIsLocating(false);
           setIsCheckAreaOpen(true);
@@ -186,7 +228,7 @@ export default function App() {
 
         const activeNearest = closest || zones[0] || null;
         setNearestZone(activeNearest);
-        setDistanceToNearestKm(minDistance === Infinity ? 12.4 : minDistance);
+        setDistanceToNearestKm(minDistance === Infinity ? null : minDistance);
         setIsLocating(false);
         setIsCheckAreaOpen(true);
 
@@ -204,28 +246,52 @@ export default function App() {
       },
       (err) => {
         console.warn('Geolocation failed:', err.message);
-        // Provide friendly fallback using the first zone
-        const fallback = zones[0] || MONITORING_ZONES[0];
-        if (fallback && Array.isArray(fallback.center) && typeof fallback.center[0] === 'number') {
-          setNearestZone(fallback);
-          setDistanceToNearestKm(12.4);
-          setUserCoords({ lat: fallback.center[0] + 0.02, lng: fallback.center[1] + 0.02 });
-          setSelectedZone(fallback);
+        void fetchNetworkLocation()
+          .then((networkLocation) => {
+            if (!networkLocation) throw new Error('Network location unavailable');
 
-          // Fetch real-time weather for fallback coordinates
-          setIsLoadingUserWeather(true);
-          fetchLivePointWeather(fallback.center[0] + 0.02, fallback.center[1] + 0.02, 'Regional Station')
-            .then((weather) => setUserWeather(weather))
-            .catch(() => {})
-            .finally(() => setIsLoadingUserWeather(false));
-        } else {
-          setUserCoords(null);
-        }
-        setGeoError(
-          'Location access was not granted or timed out. Showing proximity analysis relative to the nearest active monitoring sector.'
-        );
-        setIsLocating(false);
-        setIsCheckAreaOpen(true);
+            setUserCoords(networkLocation);
+            let minDistance = Infinity;
+            let closest: ZoneWithTelemetry | null = null;
+            zones.forEach((z) => {
+              if (Array.isArray(z.center) && typeof z.center[0] === 'number') {
+                const distance = calculateDistanceKm(
+                  networkLocation.lat,
+                  networkLocation.lng,
+                  z.center[0],
+                  z.center[1]
+                );
+                if (distance < minDistance) {
+                  minDistance = distance;
+                  closest = z;
+                }
+              }
+            });
+            const activeNearest = closest || zones[0] || null;
+            setNearestZone(activeNearest);
+            setDistanceToNearestKm(minDistance === Infinity ? null : minDistance);
+            setSelectedZone(activeNearest);
+            setIsLocating(false);
+            setIsCheckAreaOpen(true);
+
+            setIsLoadingUserWeather(true);
+            return fetchLivePointWeather(networkLocation.lat, networkLocation.lng, 'Network Location')
+              .then((weather) => setUserWeather(weather))
+              .catch((weatherError) => console.warn('Could not fetch network-location weather:', weatherError))
+              .finally(() => setIsLoadingUserWeather(false));
+          })
+          .catch(() => {
+            const fallback = zones[0] || MONITORING_ZONES[0];
+            setNearestZone(fallback);
+            setDistanceToNearestKm(null);
+            setUserCoords(null);
+            setSelectedZone(fallback);
+            setGeoError(
+              'Browser and network location services were unavailable. Showing the nearest monitored sector without claiming a user position.'
+            );
+            setIsLocating(false);
+            setIsCheckAreaOpen(true);
+          });
       },
       { timeout: 8000, enableHighAccuracy: false }
     );
@@ -307,114 +373,108 @@ export default function App() {
             </div>
           ) : (
             <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Mobile Tab Switcher */}
-          <div className="lg:hidden flex items-center justify-around border-b border-stone-200/80 bg-white/80 backdrop-blur-md px-2 py-2 text-xs font-semibold text-stone-700 shadow-2xs">
-            <button
-              onClick={() => setMobileTab('MAP')}
-              className={`tactile-btn flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl transition cursor-pointer ${
-                mobileTab === 'MAP'
-                  ? 'bg-stone-900 text-white font-bold shadow-xs'
-                  : 'text-stone-600 hover:bg-stone-100'
-              }`}
-            >
-              <Map className="w-3.5 h-3.5 text-orange-500" />
-              <span>Map View</span>
-            </button>
-            <button
-              onClick={() => setMobileTab('LIST')}
-              className={`tactile-btn flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl transition cursor-pointer ${
-                mobileTab === 'LIST'
-                  ? 'bg-stone-900 text-white font-bold shadow-xs'
-                  : 'text-stone-600 hover:bg-stone-100'
-              }`}
-            >
-              <ListFilter className="w-3.5 h-3.5 text-orange-500" />
-              <span>Sectors ({zones.length})</span>
-            </button>
-            <button
-              onClick={() => setMobileTab('DETAIL')}
-              className={`tactile-btn flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl transition cursor-pointer ${
-                mobileTab === 'DETAIL'
-                  ? 'bg-stone-900 text-white font-bold shadow-xs'
-                  : 'text-stone-600 hover:bg-stone-100'
-              }`}
-            >
-              <Activity className="w-3.5 h-3.5 text-orange-500" />
-              <span>Sector Analysis</span>
-            </button>
-          </div>
+              {/* Mobile Tab Switcher */}
+              <div className="lg:hidden flex items-center justify-around border-b border-stone-200/80 bg-white/80 backdrop-blur-md px-2 py-2 text-xs font-semibold text-stone-700 shadow-2xs">
+                <button
+                  onClick={() => setMobileTab('MAP')}
+                  className={`tactile-btn flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl transition cursor-pointer ${mobileTab === 'MAP'
+                    ? 'bg-stone-900 text-white font-bold shadow-xs'
+                    : 'text-stone-600 hover:bg-stone-100'
+                    }`}
+                >
+                  <Map className="w-3.5 h-3.5 text-orange-500" />
+                  <span>Map View</span>
+                </button>
+                <button
+                  onClick={() => setMobileTab('LIST')}
+                  className={`tactile-btn flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl transition cursor-pointer ${mobileTab === 'LIST'
+                    ? 'bg-stone-900 text-white font-bold shadow-xs'
+                    : 'text-stone-600 hover:bg-stone-100'
+                    }`}
+                >
+                  <ListFilter className="w-3.5 h-3.5 text-orange-500" />
+                  <span>Sectors ({zones.length})</span>
+                </button>
+                <button
+                  onClick={() => setMobileTab('DETAIL')}
+                  className={`tactile-btn flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl transition cursor-pointer ${mobileTab === 'DETAIL'
+                    ? 'bg-stone-900 text-white font-bold shadow-xs'
+                    : 'text-stone-600 hover:bg-stone-100'
+                    }`}
+                >
+                  <Activity className="w-3.5 h-3.5 text-orange-500" />
+                  <span>Sector Analysis</span>
+                </button>
+              </div>
 
-          {/* Desktop 3-Column Layout / Mobile Single Tab */}
-          <div className="flex-1 flex flex-col lg:flex-row overflow-hidden relative min-h-0">
-            {/* Left Column: Sectors List */}
-            <div
-              className={`h-full ${
-                mobileTab === 'LIST' ? 'flex flex-1 w-full min-h-0' : 'hidden lg:flex min-h-0'
-              }`}
-            >
-              <SidebarZoneList
-                zones={zones}
-                selectedZone={selectedZone}
-                onSelectZone={(z) => {
-                  setSelectedZone(z);
-                  setMobileTab('DETAIL');
-                }}
-              />
-            </div>
-
-            {/* Center Column: Interactive Hero Map */}
-            <main
-              className={`h-full flex-1 relative min-h-0 ${
-                mobileTab === 'MAP' ? 'flex flex-1 w-full min-h-[400px]' : 'hidden lg:flex'
-              }`}
-            >
-              <InteractiveMap
-                zones={zones}
-                selectedZone={selectedZone}
-                onSelectZone={(z) => {
-                  setSelectedZone(z);
-                  setMobileTab('DETAIL');
-                }}
-                userLocation={userCoords}
-                filterHazard={filterHazard}
-                onFilterChange={setFilterHazard}
-                onGoHome={() => setCurrentView('LANDING')}
-                onScanLocation={handleCheckMyArea}
-                isLocating={isLocating}
-              />
-            </main>
-
-            {/* Right Column: Selected Sector Deep Telemetry & Recharts */}
-            <div
-              className={`h-full ${
-                mobileTab === 'DETAIL' ? 'flex flex-1 w-full' : 'hidden lg:flex'
-              }`}
-            >
-              {selectedZone ? (
-                <ZoneDetailPanel
-                  zone={selectedZone}
-                  onClose={() => setSelectedZone(null)}
-                  onOpenSmsSimulator={() => setIsSmsOpen(true)}
-                  onOpenHowItWorks={() => setIsHowItWorksOpen(true)}
-                />
-              ) : (
-                <div className="w-80 xl:w-96 bg-stone-50/80 backdrop-blur-md border-l border-stone-200/80 p-8 flex flex-col items-center justify-center text-stone-500 text-xs text-center font-medium gap-2">
-                  <div className="w-10 h-10 rounded-2xl glass-card border border-stone-200/80 flex items-center justify-center text-stone-400 shadow-2xs">
-                    <Activity className="w-5 h-5" />
-                  </div>
-                  <p className="max-w-[200px]">
-                    Select a watershed on the map or from the sector directory to inspect live telemetry.
-                  </p>
+              {/* Desktop 3-Column Layout / Mobile Single Tab */}
+              <div className="flex-1 flex flex-col lg:flex-row overflow-hidden relative min-h-0">
+                {/* Left Column: Sectors List */}
+                <div
+                  className={`h-full ${mobileTab === 'LIST' ? 'flex flex-1 w-full min-h-0' : 'hidden lg:flex min-h-0'
+                    }`}
+                >
+                  <SidebarZoneList
+                    zones={zones}
+                    selectedZone={selectedZone}
+                    onSelectZone={(z) => {
+                      setSelectedZone(z);
+                      setMobileTab('DETAIL');
+                    }}
+                  />
                 </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-    </>
-  )}
 
-  {/* Modals & Dialogs */}
+                {/* Center Column: Interactive Hero Map */}
+                <main
+                  className={`h-full flex-1 relative min-h-0 ${mobileTab === 'MAP' ? 'flex flex-1 w-full min-h-[400px]' : 'hidden lg:flex'
+                    }`}
+                >
+                  <InteractiveMap
+                    zones={zones}
+                    selectedZone={selectedZone}
+                    onSelectZone={(z) => {
+                      setSelectedZone(z);
+                      setMobileTab('DETAIL');
+                    }}
+                    userLocation={userCoords}
+                    filterHazard={filterHazard}
+                    onFilterChange={setFilterHazard}
+                    onGoHome={() => setCurrentView('LANDING')}
+                    onScanLocation={handleCheckMyArea}
+                    isLocating={isLocating}
+                  />
+                </main>
+
+                {/* Right Column: Selected Sector Deep Telemetry & Recharts */}
+                <div
+                  className={`h-full ${mobileTab === 'DETAIL' ? 'flex flex-1 w-full' : 'hidden lg:flex'
+                    }`}
+                >
+                  {selectedZone ? (
+                    <ZoneDetailPanel
+                      zone={selectedZone}
+                      onClose={() => setSelectedZone(null)}
+                      onOpenSmsSimulator={() => setIsSmsOpen(true)}
+                      onOpenHowItWorks={() => setIsHowItWorksOpen(true)}
+                    />
+                  ) : (
+                    <div className="w-80 xl:w-96 bg-stone-50/80 backdrop-blur-md border-l border-stone-200/80 p-8 flex flex-col items-center justify-center text-stone-500 text-xs text-center font-medium gap-2">
+                      <div className="w-10 h-10 rounded-2xl glass-card border border-stone-200/80 flex items-center justify-center text-stone-400 shadow-2xs">
+                        <Activity className="w-5 h-5" />
+                      </div>
+                      <p className="max-w-[200px]">
+                        Select a watershed on the map or from the sector directory to inspect live telemetry.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Modals & Dialogs */}
       <HowItWorksModal
         isOpen={isHowItWorksOpen}
         onClose={() => setIsHowItWorksOpen(false)}

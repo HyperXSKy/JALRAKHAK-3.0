@@ -74,7 +74,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             <span className="text-stone-900 font-bold">Assam Basin Live Telemetry</span>
             <span className="text-stone-400">&bull;</span>
             <span className="text-stone-600 font-medium">
-              {isLiveApi ? 'Open-Meteo Radar Connected' : 'Simulated Telemetry'}
+              {isLiveApi ? 'Open-Meteo feed connected' : 'Simulation mode'}
             </span>
             {lastSyncTime && (
               <span className="hidden sm:inline text-stone-400 font-mono text-[11px]">
@@ -129,7 +129,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 <Compass className="w-3.5 h-3.5 text-stone-400" />
               </div>
               <div className="text-2xl font-black text-stone-900 font-mono">
-                {zones.length || 8}
+                {zones.length || '—'}
               </div>
               <p className="text-[11px] text-stone-500 mt-0.5">High-vulnerability sectors</p>
             </div>
@@ -325,7 +325,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 Cell Broadcast &amp; SMS Dissemination
               </h3>
               <p className="text-xs text-stone-600 leading-relaxed">
-                Direct integration with cellular warning gateways. When composite scores cross alert thresholds, automated warning packets are formatted for localized broadcast without app dependency.
+                Warning packets are formatted for review in the simulator. Cellular gateway delivery is not connected in this prototype.
               </p>
               <div className="pt-2">
                 <button

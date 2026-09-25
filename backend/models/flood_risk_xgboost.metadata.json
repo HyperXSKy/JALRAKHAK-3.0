@@ -1,0 +1,32 @@
+{
+  "model": "XGBoost binary classifier",
+  "dataSource": "Open-Meteo Archive hourly precipitation plus static zone terrain/soil/exposure data",
+  "label": "rainfall_triggered_flood_risk_proxy",
+  "labelDefinition": "Broad next-24h rainfall threshold adjusted by river proximity; not an observed flood event label.",
+  "periodStart": "2021-01-01",
+  "periodEnd": "2025-12-31",
+  "samples": 116608,
+  "zones": 8,
+  "features": [
+    "current_rain_mm_h",
+    "rain_24h_mm",
+    "rain_72h_mm",
+    "forecast_24h_mm",
+    "humidity_percent",
+    "slope_degrees",
+    "elevation_m",
+    "river_proximity_km",
+    "soil_saturation_percent",
+    "impervious_fraction",
+    "catchment_area_km2"
+  ],
+  "chronologicalHoldout": {
+    "accuracy": 0.974,
+    "precision": 0.132,
+    "recall": 0.394,
+    "positiveEvents": 193,
+    "decisionThreshold": 0.8500000000000002,
+    "scalePosWeight": 64.69,
+    "f1": 0.198
+  }
+}

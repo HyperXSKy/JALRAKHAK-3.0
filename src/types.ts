@@ -35,6 +35,7 @@ export interface WeatherRainfallData {
   }[];
   lastUpdated: string;
   isLive: boolean;
+  dataQuality?: 'live' | 'simulated' | 'unavailable';
   weatherDescription: string;
   temperatureC?: number;
   humidityPercent?: number;

@@ -43,7 +43,7 @@ export const CheckAreaModal: React.FC<CheckAreaModalProps> = ({
             </div>
             <div>
               <h3 className="text-sm font-bold text-stone-900">Real-Time Local Area Telemetry</h3>
-              <p className="text-[11px] text-stone-500 font-medium">Live GPS &amp; Open-Meteo Atmosphere Query</p>
+              <p className="text-[11px] text-stone-500 font-medium">GPS &amp; Open-Meteo forecast query</p>
             </div>
           </div>
           <button
@@ -75,16 +75,16 @@ export const CheckAreaModal: React.FC<CheckAreaModalProps> = ({
               <div className="flex items-center justify-between p-3 glass-card border border-stone-200/80 rounded-xl text-xs">
                 <span className="text-stone-600 font-medium flex items-center gap-2">
                   <Navigation className="w-3.5 h-3.5 text-orange-600" />
-                  Your Detected GPS Position:
+                  Detected Location:
                 </span>
                 <span className="font-mono font-bold text-stone-900 bg-white/80 px-2.5 py-0.5 rounded-md border border-stone-200/60">
                   {typeof userCoords.lat === 'number' && !isNaN(userCoords.lat)
                     ? userCoords.lat.toFixed(4)
-                    : '0.0000'}
+                    : 'Unavailable'}
                   °,{' '}
                   {typeof userCoords.lng === 'number' && !isNaN(userCoords.lng)
                     ? userCoords.lng.toFixed(4)
-                    : '0.0000'}
+                    : 'Unavailable'}
                   °
                 </span>
               </div>
@@ -94,7 +94,7 @@ export const CheckAreaModal: React.FC<CheckAreaModalProps> = ({
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] uppercase font-bold text-stone-600 flex items-center gap-1.5">
                     <span className="w-2 h-2 rounded-full bg-orange-600 animate-ping" />
-                    Live Meteorological Feed at Coordinates
+                    Open-Meteo Forecast at Coordinates
                   </span>
                   <span className="text-[10px] text-stone-400 font-mono font-medium">
                     Open-Meteo Live API
@@ -104,7 +104,7 @@ export const CheckAreaModal: React.FC<CheckAreaModalProps> = ({
                 {isLoadingWeather ? (
                   <div className="py-5 text-center text-stone-500">
                     <CloudRain className="w-5 h-5 mx-auto animate-bounce text-orange-600 mb-1.5" />
-                    Fetching real-time precipitation radar &amp; atmospheric sensors...
+                    Fetching Open-Meteo forecast data...
                   </div>
                 ) : userWeather ? (
                   <div className="space-y-2.5">
