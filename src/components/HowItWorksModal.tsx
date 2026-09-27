@@ -1,20 +1,25 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { X, Calculator, ShieldCheck, Mountain, Waves, ExternalLink, HelpCircle } from 'lucide-react';
 import { RISK_PALETTE, getRiskLevel } from '../utils/riskEngine';
+import type { SandboxInputs } from '../services/sandbox';
 
 interface HowItWorksModalProps {
   isOpen: boolean;
   onClose: () => void;
+  inputs: SandboxInputs;
+  onInputsChange: (inputs: SandboxInputs) => void;
 }
 
-export const HowItWorksModal: React.FC<HowItWorksModalProps> = ({ isOpen, onClose }) => {
-  const [testRainRate, setTestRainRate] = useState<number>(12); // mm/h
-  const [test24hRain, setTest24hRain] = useState<number>(65); // mm
-  const [test72hRain, setTest72hRain] = useState<number>(90); // mm
-  const [testSlope, setTestSlope] = useState<number>(32); // degrees
-  const [testRiverKm, setTestRiverKm] = useState<number>(0.3); // km
-  const [testSaturation, setTestSaturation] = useState<number>(75); // %
-  const [testElevationM, setTestElevationM] = useState<number>(780); // m
+export const HowItWorksModal: React.FC<HowItWorksModalProps> = ({ isOpen, onClose, inputs, onInputsChange }) => {
+  const {
+    rainRate: testRainRate,
+    rain24h: test24hRain,
+    rain72h: test72hRain,
+    slope: testSlope,
+    riverKm: testRiverKm,
+    saturation: testSaturation,
+    elevationM: testElevationM,
+  } = inputs;
 
   if (!isOpen) return null;
 
@@ -194,7 +199,7 @@ export const HowItWorksModal: React.FC<HowItWorksModalProps> = ({ isOpen, onClos
                   max="60"
                   step="1"
                   value={testRainRate}
-                  onChange={(e) => setTestRainRate(Number(e.target.value))}
+                  onChange={(e) => onInputsChange({ ...inputs, rainRate: Number(e.target.value) })}
                   className="w-full accent-orange-600 cursor-pointer"
                 />
               </div>
@@ -210,7 +215,7 @@ export const HowItWorksModal: React.FC<HowItWorksModalProps> = ({ isOpen, onClos
                   max="200"
                   step="5"
                   value={test24hRain}
-                  onChange={(e) => setTest24hRain(Number(e.target.value))}
+                  onChange={(e) => onInputsChange({ ...inputs, rain24h: Number(e.target.value) })}
                   className="w-full accent-orange-600 cursor-pointer"
                 />
               </div>
@@ -226,7 +231,7 @@ export const HowItWorksModal: React.FC<HowItWorksModalProps> = ({ isOpen, onClos
                   max="400"
                   step="5"
                   value={test72hRain}
-                  onChange={(e) => setTest72hRain(Number(e.target.value))}
+                  onChange={(e) => onInputsChange({ ...inputs, rain72h: Number(e.target.value) })}
                   className="w-full accent-orange-600 cursor-pointer"
                 />
               </div>
@@ -242,7 +247,7 @@ export const HowItWorksModal: React.FC<HowItWorksModalProps> = ({ isOpen, onClos
                   max="50"
                   step="1"
                   value={testSlope}
-                  onChange={(e) => setTestSlope(Number(e.target.value))}
+                  onChange={(e) => onInputsChange({ ...inputs, slope: Number(e.target.value) })}
                   className="w-full accent-orange-600 cursor-pointer"
                 />
               </div>
@@ -258,7 +263,7 @@ export const HowItWorksModal: React.FC<HowItWorksModalProps> = ({ isOpen, onClos
                   max="4.0"
                   step="0.1"
                   value={testRiverKm}
-                  onChange={(e) => setTestRiverKm(Number(e.target.value))}
+                  onChange={(e) => onInputsChange({ ...inputs, riverKm: Number(e.target.value) })}
                   className="w-full accent-orange-600 cursor-pointer"
                 />
               </div>
@@ -272,9 +277,9 @@ export const HowItWorksModal: React.FC<HowItWorksModalProps> = ({ isOpen, onClos
                   type="range"
                   min="0"
                   max="1500"
-                  step="25"
+                  step="5"
                   value={testElevationM}
-                  onChange={(e) => setTestElevationM(Number(e.target.value))}
+                  onChange={(e) => onInputsChange({ ...inputs, elevationM: Number(e.target.value) })}
                   className="w-full accent-orange-600 cursor-pointer"
                 />
               </div>
@@ -290,7 +295,7 @@ export const HowItWorksModal: React.FC<HowItWorksModalProps> = ({ isOpen, onClos
                   max="100"
                   step="1"
                   value={testSaturation}
-                  onChange={(e) => setTestSaturation(Number(e.target.value))}
+                  onChange={(e) => onInputsChange({ ...inputs, saturation: Number(e.target.value) })}
                   className="w-full accent-orange-600 cursor-pointer"
                 />
               </div>

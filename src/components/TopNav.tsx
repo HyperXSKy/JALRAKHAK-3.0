@@ -1,16 +1,17 @@
 import React from 'react';
 import type { SimulationScenario } from '../services/openMeteo';
-import { Bell, LoaderCircle, MapPin } from 'lucide-react';
+import { Bell, FlaskConical, LayoutDashboard, LoaderCircle, MapPin, Siren } from 'lucide-react';
+
+type AppView = 'LANDING' | 'DASHBOARD' | 'SIMULATION' | 'ALERTS';
 
 interface TopNavProps {
-  currentView?: 'LANDING' | 'DASHBOARD';
-  onViewChange?: (view: 'LANDING' | 'DASHBOARD') => void;
+  currentView?: AppView;
+  onViewChange?: (view: AppView) => void;
   alertCount: number;
   onOpenAlerts: () => void;
   onCheckMyArea: () => void;
   isLocating: boolean;
   onOpenHowItWorks: () => void;
-  onOpenSmsSimulator: () => void;
   simulationScenario: SimulationScenario;
   onScenarioChange: (scenario: SimulationScenario) => void;
   onRefreshData: () => void;
@@ -23,6 +24,7 @@ interface TopNavProps {
 }
 
 export const TopNav: React.FC<TopNavProps> = ({
+  currentView,
   onViewChange,
   alertCount,
   onOpenAlerts,
@@ -44,7 +46,25 @@ export const TopNav: React.FC<TopNavProps> = ({
             </div>
           </div>
         </div>
-        <nav aria-label="Quick actions" className="flex items-center gap-2">
+        <nav aria-label="Primary" className="flex flex-wrap items-center gap-1">
+          {([
+            { view: 'DASHBOARD', label: 'Map', icon: LayoutDashboard },
+            { view: 'SIMULATION', label: 'Simulation', icon: FlaskConical },
+            { view: 'ALERTS', label: 'Alerts', icon: Siren },
+          ] as const).map(({ view, label, icon: Icon }) => (
+            <button
+              key={view}
+              type="button"
+              onClick={() => onViewChange?.(view)}
+              aria-current={currentView === view ? 'page' : undefined}
+              className={`flex items-center gap-1.5 px-2.5 py-2 text-xs font-bold transition ${currentView === view ? 'bg-stone-900 text-white' : 'text-stone-700 hover:bg-white/80'}`}
+            >
+              <Icon className="h-3.5 w-3.5" />
+              <span>{label}</span>
+              {view === 'ALERTS' && <span className="font-mono">{alertCount}</span>}
+            </button>
+          ))}
+          <span className="mx-1 h-6 border-l border-stone-300" />
           <button
             type="button"
             onClick={onCheckMyArea}
@@ -58,14 +78,14 @@ export const TopNav: React.FC<TopNavProps> = ({
           <button
             type="button"
             onClick={onOpenAlerts}
-            aria-label={`Open alerts${alertCount ? `, ${alertCount} active` : ''}`}
+            aria-label={`Open active alert list${alertCount ? `, ${alertCount} active` : ''}`}
             className={`tactile-btn flex items-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-bold cursor-pointer ${alertCount > 0
               ? 'border-orange-600 bg-orange-600 text-white hover:bg-orange-700'
               : 'border-stone-200 bg-white/80 text-stone-800 hover:bg-white'
               }`}
           >
             <Bell className={`w-4 h-4 ${alertCount > 0 ? 'text-white' : 'text-stone-600'}`} />
-            <span>Alerts</span>
+            <span>Active</span>
             <span className="min-w-4 text-center">{alertCount}</span>
           </button>
         </nav>

@@ -87,6 +87,7 @@ interface InteractiveMapProps {
   onGoHome?: () => void;
   onScanLocation?: () => void;
   isLocating?: boolean;
+  simulationMode?: boolean;
 }
 
 // Coordinate safety validators to avoid Leaflet "Invalid LatLng object: (NaN, NaN)"
@@ -115,6 +116,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   onGoHome,
   onScanLocation,
   isLocating = false,
+  simulationMode = false,
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
@@ -131,7 +133,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   const [isLayerMenuOpen, setIsLayerMenuOpen] = useState<boolean>(false);
   const [isFullMap, setIsFullMap] = useState<boolean>(false);
 
-  useEffect(() => {
+    useEffect(() => {
     if (!isFullMap) return;
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') setIsFullMap(false);
@@ -476,7 +478,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
             
             <div class="grid grid-cols-2 gap-2 p-2 mb-3 bg-stone-50 rounded border border-stone-200 text-xs">
               <div>
-                <span class="text-stone-700 block text-[10px] uppercase font-semibold">Live Rain</span>
+                <span class="text-stone-700 block text-[10px] uppercase font-semibold">${simulationMode && isSelected ? 'Simulated Rain' : 'Live Rain'}</span>
                 <span class="font-bold text-stone-900">${zone.weather.currentRateMmPerHour.toFixed(1)} mm/h</span>
               </div>
               <div>
@@ -529,6 +531,8 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     });
   }, [zones, selectedZone, filterHazard, onSelectZone, baseLayer, showHeatmap]);
 
+  const selectedZoneId = selectedZone?.id;
+
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map || !selectedZone) return;
@@ -547,7 +551,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         console.warn('Map flyTo failed:', e);
       }
     }
-  }, [selectedZone]);
+  }, [selectedZoneId]);
 
   useEffect(() => {
     const map = mapInstanceRef.current;
@@ -1056,7 +1060,9 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         <p className="mt-2 text-[10px] text-stone-600 border-t border-stone-200/70 pt-1.5 leading-tight font-normal">
           {showHeatmap
             ? 'Continuous thermal gradient reflects multi-parameter composite risk scores across all monitored Assam basins and slopes.'
-            : 'Zones show watershed boundaries tinted by composite risk formula. Click any polygon or marker for live telemetry.'}
+            : simulationMode
+              ? 'The selected watershed reflects sandbox inputs. Other regions continue to show live assessments.'
+              : 'Zones show watershed boundaries tinted by composite risk formula. Click any polygon or marker for live telemetry.'}
         </p>
       </div>
     </div>

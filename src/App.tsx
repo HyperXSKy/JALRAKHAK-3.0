@@ -14,11 +14,13 @@ import { SidebarZoneList } from './components/SidebarZoneList';
 import { InteractiveMap } from './components/InteractiveMap';
 import { ZoneDetailPanel } from './components/ZoneDetailPanel';
 import { HowItWorksModal } from './components/HowItWorksModal';
-import { SmsPushModal } from './components/SmsPushModal';
 import { CheckAreaModal } from './components/CheckAreaModal';
 import { AlertsDrawerModal } from './components/AlertsDrawerModal';
 import { LandingPage } from './components/LandingPage';
 import { Map, ListFilter, Activity, RefreshCw } from 'lucide-react';
+import { DEFAULT_SANDBOX_INPUTS, SandboxInputs, applySandboxInputs } from './services/sandbox';
+import { SimulationWorkspace } from './components/SimulationWorkspace';
+import { AlertsWorkspace } from './components/AlertsWorkspace';
 
 async function fetchNetworkLocation(): Promise<{ lat: number; lng: number } | null> {
   const controller = new AbortController();
@@ -67,11 +69,13 @@ function fetchBrowserFallbackZones(scenario: SimulationScenario): Promise<ZoneWi
 }
 
 export default function App() {
-  const [currentView, setCurrentView] = useState<'LANDING' | 'DASHBOARD'>('LANDING');
+  const [currentView, setCurrentView] = useState<'LANDING' | 'DASHBOARD' | 'SIMULATION' | 'ALERTS'>('LANDING');
   const [zones, setZones] = useState<ZoneWithTelemetry[]>([]);
   const [selectedZone, setSelectedZone] = useState<ZoneWithTelemetry | null>(null);
   const [alerts, setAlerts] = useState<EarlyWarningAlert[]>([]);
   const [scenario, setScenario] = useState<SimulationScenario>('LIVE');
+  const [sandboxInputs, setSandboxInputs] = useState<SandboxInputs>(DEFAULT_SANDBOX_INPUTS);
+  const [simulationZoneId, setSimulationZoneId] = useState('');
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [isLiveApi, setIsLiveApi] = useState<boolean>(true);
@@ -82,7 +86,6 @@ export default function App() {
   const [filterHazard, setFilterHazard] = useState<'ALL' | 'HIGH_SEVERE' | 'LANDSLIDE' | 'FLOOD'>('ALL');
 
   const [isHowItWorksOpen, setIsHowItWorksOpen] = useState(false);
-  const [isSmsOpen, setIsSmsOpen] = useState(false);
   const [isAlertsDrawerOpen, setIsAlertsDrawerOpen] = useState(false);
 
   const [isCheckAreaOpen, setIsCheckAreaOpen] = useState(false);
@@ -333,6 +336,20 @@ export default function App() {
     setAlerts((prev) => prev.filter((a) => a.id !== alertId));
   };
 
+  const simulationTarget = zones.find((zone) => zone.id === simulationZoneId) || selectedZone || zones[0] || null;
+  const simulationZones = zones.map((zone) =>
+    simulationTarget?.id === zone.id ? applySandboxInputs(zone, sandboxInputs) : zone
+  );
+  const simulatedSelectedZone = simulationTarget
+    ? simulationZones.find((zone) => zone.id === simulationTarget.id) || null
+    : null;
+  const generatedSimulationAlert = simulatedSelectedZone
+    ? generateZoneAlert(simulatedSelectedZone, simulatedSelectedZone.assessment)
+    : null;
+  const simulationAlerts = generatedSimulationAlert
+    ? [{ ...generatedSimulationAlert, id: `simulation-${simulatedSelectedZone?.id}`, timestamp: 'Simulation preview' }]
+    : [];
+
   return (
     <div className="flex flex-col h-screen max-h-screen w-full overflow-hidden bg-[#f2f6fb] text-[#193653] font-sans selection:bg-sky-100 selection:text-sky-950">
       {/* Top Header */}
@@ -344,7 +361,6 @@ export default function App() {
         onCheckMyArea={handleCheckMyArea}
         isLocating={isLocating}
         onOpenHowItWorks={() => setIsHowItWorksOpen(true)}
-        onOpenSmsSimulator={() => setIsSmsOpen(true)}
         simulationScenario={scenario}
         onScenarioChange={handleScenarioChange}
         onRefreshData={() => loadData(scenario)}
@@ -368,7 +384,7 @@ export default function App() {
               setMobileTab('DETAIL');
             }}
             onCheckMyArea={handleCheckMyArea}
-            onOpenSmsSimulator={() => setIsSmsOpen(true)}
+            onOpenAlertDelivery={() => setCurrentView('ALERTS')}
             onOpenHowItWorks={() => setIsHowItWorksOpen(true)}
             onOpenAlerts={() => setIsAlertsDrawerOpen(true)}
             isLiveApi={isLiveApi}
@@ -377,13 +393,38 @@ export default function App() {
             isLoading={isLoading}
           />
         </div>
+      ) : isLoading ? (
+        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
+          <RefreshCw className="mb-3 h-8 w-8 animate-spin text-orange-600" />
+          <h2 className="text-base font-bold text-stone-900">Initializing Hydrological Telemetry...</h2>
+          <p className="mt-1 max-w-sm text-xs text-stone-700">Fetching rainfall and watershed data for the selected view.</p>
+        </div>
+      ) : currentView === 'SIMULATION' ? (
+        <SimulationWorkspace
+          zones={simulationZones}
+          selectedZone={simulatedSelectedZone}
+          onSelectZone={(zone) => {
+            setSimulationZoneId(zone.id);
+            setSelectedZone(zones.find((item) => item.id === zone.id) || zone);
+          }}
+          inputs={sandboxInputs}
+          onInputsChange={setSandboxInputs}
+          onReset={() => setSandboxInputs(DEFAULT_SANDBOX_INPUTS)}
+          simulationAlert={generatedSimulationAlert}
+        />
+      ) : currentView === 'ALERTS' ? (
+        <AlertsWorkspace
+          alerts={alerts}
+          simulationAlerts={simulationAlerts}
+          onOpenSimulation={() => setCurrentView('SIMULATION')}
+        />
       ) : (
         <>
           {/* Threshold Violations Alert Banner */}
           <AlertBanner
             alerts={alerts}
             onSelectZoneById={handleSelectZoneById}
-            onOpenSmsSimulator={() => setIsSmsOpen(true)}
+            onOpenAlertDelivery={() => setCurrentView('ALERTS')}
           />
 
           {/* Main Content Area */}
@@ -480,7 +521,7 @@ export default function App() {
                     <ZoneDetailPanel
                       zone={selectedZone}
                       onClose={() => setSelectedZone(null)}
-                      onOpenSmsSimulator={() => setIsSmsOpen(true)}
+                      onOpenAlertDelivery={() => setCurrentView('ALERTS')}
                       onOpenHowItWorks={() => setIsHowItWorksOpen(true)}
                     />
                   ) : (
@@ -504,13 +545,8 @@ export default function App() {
       <HowItWorksModal
         isOpen={isHowItWorksOpen}
         onClose={() => setIsHowItWorksOpen(false)}
-      />
-
-      <SmsPushModal
-        isOpen={isSmsOpen}
-        onClose={() => setIsSmsOpen(false)}
-        zones={zones}
-        selectedZone={selectedZone}
+        inputs={sandboxInputs}
+        onInputsChange={setSandboxInputs}
       />
 
       <CheckAreaModal

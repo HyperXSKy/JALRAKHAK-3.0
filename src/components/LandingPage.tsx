@@ -3,6 +3,7 @@ import {
   ShieldAlert,
   MapPin,
   Radio,
+  Send,
   ArrowRight,
   Calculator,
   CloudRain,
@@ -26,7 +27,7 @@ interface LandingPageProps {
   onLaunchConsole: () => void;
   onSelectZone: (zone: ZoneWithTelemetry) => void;
   onCheckMyArea: () => void;
-  onOpenSmsSimulator: () => void;
+  onOpenAlertDelivery: () => void;
   onOpenHowItWorks: () => void;
   onOpenAlerts: () => void;
   isLiveApi: boolean;
@@ -41,7 +42,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   onLaunchConsole,
   onSelectZone,
   onCheckMyArea,
-  onOpenSmsSimulator,
+  onOpenAlertDelivery,
   onOpenHowItWorks,
   onOpenAlerts,
   isLiveApi,
@@ -328,18 +329,18 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 <Radio className="w-5 h-5" />
               </div>
               <h3 className="text-base font-bold text-stone-900">
-                Cell Broadcast &amp; SMS Dissemination
+                Real alert delivery
               </h3>
               <p className="text-xs text-stone-600 leading-relaxed">
-                Warning packets are formatted for review in the simulator. Cellular gateway delivery is not connected in this prototype.
+                Send active high-severity advisories to a server-configured webhook. Delivery is reported only after the destination accepts the alert.
               </p>
               <div className="pt-2">
                 <button
-                  onClick={onOpenSmsSimulator}
+                  onClick={onOpenAlertDelivery}
                   className="tactile-btn inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-white border border-stone-200 text-[11px] font-bold text-orange-700 hover:text-orange-900 cursor-pointer shadow-2xs"
                 >
-                  <Radio className="w-3 h-3 text-orange-600" />
-                  <span>Launch SMS Dispatch Simulator</span>
+                  <Send className="w-3 h-3 text-orange-600" />
+                  <span>Open alert delivery</span>
                 </button>
               </div>
             </div>
@@ -400,8 +401,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             <button onClick={onOpenHowItWorks} className="hover:text-stone-900 cursor-pointer">
               How risk is calculated
             </button>
-            <button onClick={onOpenSmsSimulator} className="hover:text-stone-900 cursor-pointer">
-              SMS demo
+            <button onClick={onOpenAlertDelivery} className="hover:text-stone-900 cursor-pointer">
+              Alert delivery
             </button>
             <button onClick={onLaunchConsole} className="hover:text-orange-700 cursor-pointer">
               Risk map

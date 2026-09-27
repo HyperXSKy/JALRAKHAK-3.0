@@ -15,6 +15,31 @@ const BACKEND_BASE_URL = (import.meta.env.VITE_BACKEND_URL || 'http://127.0.0.1:
 const BACKEND_REQUEST_TIMEOUT_MS = 12000;
 const inFlightRequests = new Map<SimulationScenario, Promise<BackendDashboardResponse>>();
 
+export interface AlertDeliveryStatus {
+  configured: boolean;
+  channels: Record<DeliveryChannel, boolean>;
+}
+
+export type DeliveryChannel = 'webhook' | 'email' | 'sms';
+
+export async function getAlertDeliveryStatus(): Promise<AlertDeliveryStatus> {
+  const response = await fetch(`${BACKEND_BASE_URL}/api/alerts/delivery-status`);
+  if (!response.ok) throw new Error(`Alert delivery status HTTP ${response.status}`);
+  return response.json() as Promise<AlertDeliveryStatus>;
+}
+
+export async function deliverAlert(alert: EarlyWarningAlert, channel: DeliveryChannel): Promise<void> {
+  const response = await fetch(`${BACKEND_BASE_URL}/api/alerts/deliver`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...alert, channel }),
+  });
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(payload?.detail || `Alert delivery HTTP ${response.status}`);
+  }
+}
+
 export function fetchBackendDashboard(
   scenario: SimulationScenario,
   signal?: AbortSignal

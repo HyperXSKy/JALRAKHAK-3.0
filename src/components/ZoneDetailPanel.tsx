@@ -33,14 +33,14 @@ import {
 
 interface ZoneDetailPanelProps {
   zone: ZoneWithTelemetry;
-  onOpenSmsSimulator: () => void;
+  onOpenAlertDelivery: () => void;
   onOpenHowItWorks: () => void;
   onClose?: () => void;
 }
 
 export const ZoneDetailPanel: React.FC<ZoneDetailPanelProps> = ({
   zone,
-  onOpenSmsSimulator,
+  onOpenAlertDelivery,
   onOpenHowItWorks,
   onClose,
 }) => {
@@ -480,15 +480,15 @@ export const ZoneDetailPanel: React.FC<ZoneDetailPanelProps> = ({
           </div>
         </section>
 
-        {/* Simulate SMS Dispatch Button */}
+        {/* Alert Delivery Action */}
         <div className="pt-2">
           <button
             id="btn-simulate-zone-sms"
-            onClick={onOpenSmsSimulator}
+            onClick={onOpenAlertDelivery}
             className="tactile-btn w-full py-2.5 px-3 bg-gradient-to-r from-orange-500 via-orange-600 to-orange-700 hover:from-orange-600 hover:to-orange-800 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-md shadow-orange-500/20 border border-orange-400/30 transition cursor-pointer"
           >
             <Radio className="w-4 h-4" />
-            <span>Simulate Citizen SMS / Push Alert Broadcast</span>
+            <span>Open live alert delivery</span>
           </button>
         </div>
       </div>

@@ -5,13 +5,13 @@ import { ShieldAlert, AlertTriangle, ChevronRight, X, Volume2, VolumeX, Radio } 
 interface AlertBannerProps {
   alerts: EarlyWarningAlert[];
   onSelectZoneById: (zoneId: string) => void;
-  onOpenSmsSimulator: () => void;
+  onOpenAlertDelivery: () => void;
 }
 
 export const AlertBanner: React.FC<AlertBannerProps> = ({
   alerts,
   onSelectZoneById,
-  onOpenSmsSimulator,
+  onOpenAlertDelivery,
 }) => {
   const [isDismissed, setIsDismissed] = useState(false);
   const [audioEnabled, setAudioEnabled] = useState(false);
@@ -124,13 +124,13 @@ export const AlertBanner: React.FC<AlertBannerProps> = ({
           </button>
 
           <button
-            onClick={onOpenSmsSimulator}
-            aria-label="Open SMS demo"
-            title="SMS demo only; messages are not sent"
+            onClick={onOpenAlertDelivery}
+            aria-label="Open alert delivery"
+            title="Deliver this alert through the configured webhook"
             className="tactile-btn flex items-center gap-1.5 px-2.5 py-1.5 bg-white/90 hover:bg-white text-stone-900 rounded-lg font-semibold text-[11px] transition shadow-2xs border border-stone-200/80 cursor-pointer"
           >
             <Radio className="w-3.5 h-3.5 text-orange-600" />
-            <span>SMS demo</span>
+            <span>Deliver alert</span>
           </button>
 
           <button
