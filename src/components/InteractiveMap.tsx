@@ -20,6 +20,9 @@ import {
   Flame,
   Home,
   LocateFixed,
+  Maximize2,
+  Minimize2,
+  ArrowLeft,
 } from 'lucide-react';
 
 export type BaseLayerType = 'light' | 'terrain' | 'satellite';
@@ -126,6 +129,16 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   const [showLabels, setShowLabels] = useState<boolean>(true);
   const [showHeatmap, setShowHeatmap] = useState<boolean>(false);
   const [isLayerMenuOpen, setIsLayerMenuOpen] = useState<boolean>(false);
+  const [isFullMap, setIsFullMap] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (!isFullMap) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsFullMap(false);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isFullMap]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -603,13 +616,28 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
 
 
   return (
-    <div id="interactive-map-wrapper" className="relative w-full h-full min-h-[480px] flex-1 bg-stone-100 overflow-hidden">
+    <div
+      id="interactive-map-wrapper"
+      className={`${isFullMap ? 'fixed inset-0 z-[60] h-[100dvh] w-screen' : 'relative h-full min-h-[480px] w-full flex-1'} bg-stone-100 overflow-hidden`}
+    >
       {/* Map DOM Canvas */}
-      <div ref={mapContainerRef} className="absolute inset-0 w-full h-full z-0" style={{ minHeight: '480px' }} />
+      <div ref={mapContainerRef} className="absolute inset-0 z-0 h-full w-full" style={{ minHeight: isFullMap ? '100dvh' : '480px' }} />
 
       {/* ── Back to Home  &  My Location  ─ floating action row ── */}
-      {(onGoHome || onScanLocation) && (
+      {(isFullMap || onGoHome || onScanLocation) && (
         <div className="absolute top-4 left-4 z-20 flex items-center gap-2">
+
+          {isFullMap && (
+            <button
+              id="btn-map-return-dashboard"
+              onClick={() => setIsFullMap(false)}
+              title="Return to dashboard"
+              className="flex items-center gap-2 rounded-full border border-white/70 bg-white/95 px-3 py-2 text-xs font-bold text-stone-800 shadow-lg backdrop-blur-sm transition hover:bg-white cursor-pointer"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Back to dashboard</span>
+            </button>
+          )}
 
           {/* Back to Homepage */}
           {onGoHome && (
@@ -764,7 +792,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           {isLayerMenuOpen && (
             <div
               id="map-layer-popover"
-              className="absolute right-0 top-full mt-2 w-72 glass-modal border border-white/80 rounded-2xl shadow-2xl p-3.5 text-stone-900 z-30"
+              className="absolute right-0 top-full mt-2 w-[min(18rem,calc(100vw-2rem))] max-h-[calc(100dvh-6rem)] overflow-y-auto glass-modal border border-white/80 rounded-3xl shadow-2xl p-3.5 text-stone-900 z-30"
             >
               <div className="flex items-center justify-between pb-2 mb-2 border-b border-stone-200/70">
                 <div className="flex items-center gap-1.5">
@@ -799,7 +827,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                       onClick={() => {
                         setBaseLayer(layerKey);
                       }}
-                      className={`tactile-btn w-full text-left p-2.5 rounded-xl border transition flex items-start gap-2.5 cursor-pointer ${isActive
+                      className={`tactile-btn w-full text-left p-3 rounded-2xl border transition flex items-start gap-2.5 cursor-pointer ${isActive
                           ? 'border-orange-500 bg-orange-50/70 text-stone-950 ring-1 ring-orange-400/40 shadow-xs'
                           : 'border-stone-200/80 bg-white/70 hover:border-stone-300 hover:bg-white text-stone-700'
                         }`}
@@ -810,14 +838,14 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                         {layerKey === 'satellite' && <Globe className="w-4 h-4 text-emerald-600" />}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold">{opt.label}</span>
+                        <div className="flex items-start justify-between gap-2">
+                          <span className="min-w-0 break-words text-xs font-bold leading-snug">{opt.label}</span>
                           {isActive && <Check className="w-3.5 h-3.5 text-orange-600 shrink-0" />}
                         </div>
-                        <p className="text-[11px] text-stone-600 mt-0.5 leading-tight line-clamp-2">
+                        <p className="text-[11px] text-stone-600 mt-1 leading-snug line-clamp-3 break-words">
                           {opt.description}
                         </p>
-                        <span className="text-[10px] text-stone-500 mt-1 inline-block font-mono">
+                        <span className="text-[10px] text-stone-500 mt-1 inline-block font-mono leading-snug break-words">
                           Source: {opt.provider}
                         </span>
                       </div>
@@ -939,6 +967,16 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
             </div>
           )}
         </div>
+
+        <button
+          id="btn-map-fullscreen"
+          onClick={() => setIsFullMap((current) => !current)}
+          title={isFullMap ? 'Exit full map view' : 'Open full map view'}
+          aria-label={isFullMap ? 'Exit full map view' : 'Open full map view'}
+          className="h-9 w-9 rounded-full border border-white/70 glass-card flex items-center justify-center text-stone-700 shadow-md transition hover:bg-white hover:text-emerald-800 cursor-pointer"
+        >
+          {isFullMap ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+        </button>
 
         {/* Map Zoom & Center Control Buttons */}
         <div className="flex flex-col gap-1 glass-card border border-white/80 rounded-xl p-1 shadow-md">
