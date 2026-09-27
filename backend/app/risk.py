@@ -71,7 +71,7 @@ def calculate_zone_risk(zone: dict, weather: dict) -> dict[str, Any]:
     elif overall == "High":
         action = "Stage SDRF; restrict low-lying roads; prepare relief camps."
     elif overall == "Severe":
-        action = "Immediate evacuation of marked inundation cells. Halt transit on valley corridors."
+        action = "Check official evacuation instructions. Avoid marked flood corridors and unstable slopes."
 
     return {
         "compositeScore": composite,

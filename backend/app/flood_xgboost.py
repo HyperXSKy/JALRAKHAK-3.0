@@ -73,9 +73,12 @@ class FloodRiskXGBoost:
         moderate_threshold = decision_threshold * 0.6
         return {
             "probability": round(probability, 3),
+            "proxyProbability": round(probability, 3),
             "riskPercent": round(probability * 100, 1),
             "level": "Severe" if probability >= 0.95 else "High" if probability >= decision_threshold else "Moderate" if probability >= moderate_threshold else "Low",
             "decisionThreshold": round(decision_threshold, 3),
+            "scoreMeaning": "Score for the rainfall-triggered flood-risk proxy label; not a calibrated probability of an observed flood event.",
+            "observedEventProbability": False,
             "model": self.metadata,
         }
 

@@ -8,6 +8,7 @@ from typing import Any, Literal
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.flood_xgboost import FLOOD_MODEL
 from app.fusion import fuse_zone
 from app.hls_inundation_model import HLS_INUNDATION_MODEL, METADATA_PATH as HLS_METADATA_PATH
 from app.open_meteo import fetch_model_forecast
@@ -153,11 +154,26 @@ async def hls_inundation_screen(lat: float, lng: float) -> dict[str, Any]:
     try:
         weather = await fetch_model_forecast(lat, lng)
         screening = HLS_INUNDATION_MODEL.predict(lat, lng, weather)
+        nearest_zone = min(
+            ZONES,
+            key=lambda zone: (zone["center"][0] - lat) ** 2
+            + ((zone["center"][1] - lng) * 0.89) ** 2,
+        )
+        flood_proxy = FLOOD_MODEL.predict(nearest_zone, weather)
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
     return {
         **screening,
         "location": {"latitude": lat, "longitude": lng},
+        "floodRiskModel": {
+            **flood_proxy,
+            "nearestZoneName": nearest_zone["name"],
+        },
+        "weather": {
+            **weather,
+            "lastUpdated": time.strftime("%H:%M:%S UTC", time.gmtime()),
+            "dataQuality": "live",
+        },
         "weatherInputs": {
             "last24hMm": weather["last24hMm"],
             "last72hMm": weather["last72hMm"],

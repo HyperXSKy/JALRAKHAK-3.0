@@ -2,7 +2,11 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { MONITORING_ZONES } from './data/zones';
 import { ZoneWithTelemetry, EarlyWarningAlert, RiskLevel, WeatherRainfallData } from './types';
 import { fetchZoneWeather, fetchLivePointWeather, SimulationScenario } from './services/openMeteo';
-import { fetchBackendDashboard } from './services/backend';
+import {
+  fetchBackendDashboard,
+  fetchHLSInundationScreen,
+  HLSInundationScreenResponse,
+} from './services/backend';
 import { calculateZoneRisk, generateZoneAlert, calculateDistanceKm } from './utils/riskEngine';
 import { TopNav } from './components/TopNav';
 import { AlertBanner } from './components/AlertBanner';
@@ -40,6 +44,28 @@ async function fetchNetworkLocation(): Promise<{ lat: number; lng: number } | nu
   }
 }
 
+const browserFallbackRequests = new globalThis.Map<SimulationScenario, Promise<ZoneWithTelemetry[]>>();
+
+function fetchBrowserFallbackZones(scenario: SimulationScenario): Promise<ZoneWithTelemetry[]> {
+  const existingRequest = browserFallbackRequests.get(scenario);
+  if (existingRequest) return existingRequest;
+
+  const request = Promise.all(
+    MONITORING_ZONES.map(async (zone) => {
+      const weather = await fetchZoneWeather(zone, scenario);
+      return { ...zone, weather, assessment: calculateZoneRisk(zone, weather) };
+    })
+  );
+  browserFallbackRequests.set(scenario, request);
+  const clearRequest = () => {
+    if (browserFallbackRequests.get(scenario) === request) {
+      browserFallbackRequests.delete(scenario);
+    }
+  };
+  void request.then(clearRequest, clearRequest);
+  return request;
+}
+
 export default function App() {
   const [currentView, setCurrentView] = useState<'LANDING' | 'DASHBOARD'>('LANDING');
   const [zones, setZones] = useState<ZoneWithTelemetry[]>([]);
@@ -64,11 +90,40 @@ export default function App() {
   const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [userWeather, setUserWeather] = useState<WeatherRainfallData | null>(null);
   const [isLoadingUserWeather, setIsLoadingUserWeather] = useState<boolean>(false);
+  const [hlsScreen, setHlsScreen] = useState<HLSInundationScreenResponse | null>(null);
+  const [hlsScreenMessage, setHlsScreenMessage] = useState<string | null>(null);
   const [nearestZone, setNearestZone] = useState<ZoneWithTelemetry | null>(null);
   const [distanceToNearestKm, setDistanceToNearestKm] = useState<number | null>(null);
   const [geoError, setGeoError] = useState<string | null>(null);
 
   const [mobileTab, setMobileTab] = useState<'MAP' | 'LIST' | 'DETAIL'>('MAP');
+
+  const loadLocationWeatherAndModel = (lat: number, lng: number, label: string) => {
+    setIsLoadingUserWeather(true);
+    setUserWeather(null);
+    setHlsScreen(null);
+    setHlsScreenMessage(null);
+
+    void fetchHLSInundationScreen(lat, lng)
+      .then((result) => {
+        setHlsScreen(result);
+        setUserWeather(result.weather);
+      })
+      .catch(async (modelError: unknown) => {
+        const message = modelError instanceof Error ? modelError.message : '';
+        setHlsScreenMessage(
+          message.toLowerCase().includes('guwahati grid')
+            ? 'The HLS model currently covers Guwahati only. Local weather is shown without a model estimate.'
+            : 'The model estimate is unavailable. Local weather is shown without it.'
+        );
+        try {
+          setUserWeather(await fetchLivePointWeather(lat, lng, label));
+        } catch (weatherError) {
+          console.warn('Could not fetch local weather:', weatherError);
+        }
+      })
+      .finally(() => setIsLoadingUserWeather(false));
+  };
 
   const loadData = useCallback(async (scenarioMode: SimulationScenario = 'LIVE') => {
     setIsRefreshing(true);
@@ -87,21 +142,13 @@ export default function App() {
       setIsRefreshing(false);
       return;
     } catch (backendError) {
-      console.warn('JALRAKSHAK backend unavailable; using browser fallback:', backendError);
+      if (!browserFallbackRequests.has(scenarioMode)) {
+        console.warn('JALRAKSHAK backend unavailable; using browser fallback:', backendError);
+      }
     }
 
     try {
-      const results = await Promise.all(
-        MONITORING_ZONES.map(async (zone) => {
-          const weather = await fetchZoneWeather(zone, scenarioMode);
-          const assessment = calculateZoneRisk(zone, weather);
-          return {
-            ...zone,
-            weather,
-            assessment,
-          };
-        })
-      );
+      const results = await fetchBrowserFallbackZones(scenarioMode);
 
       const hasLive = results.some((r) => r.weather.isLive);
       setIsLiveApi(scenarioMode === 'LIVE' && hasLive);
@@ -219,11 +266,7 @@ export default function App() {
         setIsLocating(false);
         setIsCheckAreaOpen(true);
 
-        setIsLoadingUserWeather(true);
-        fetchLivePointWeather(lat, lng, 'User Location')
-          .then((weather) => setUserWeather(weather))
-          .catch((err) => console.warn('Could not fetch user exact live weather:', err))
-          .finally(() => setIsLoadingUserWeather(false));
+        loadLocationWeatherAndModel(lat, lng, 'User Location');
 
         if (activeNearest) {
           setSelectedZone(activeNearest);
@@ -259,11 +302,7 @@ export default function App() {
             setIsLocating(false);
             setIsCheckAreaOpen(true);
 
-            setIsLoadingUserWeather(true);
-            return fetchLivePointWeather(networkLocation.lat, networkLocation.lng, 'Network Location')
-              .then((weather) => setUserWeather(weather))
-              .catch((weatherError) => console.warn('Could not fetch network-location weather:', weatherError))
-              .finally(() => setIsLoadingUserWeather(false));
+            loadLocationWeatherAndModel(networkLocation.lat, networkLocation.lng, 'Network Location');
           })
           .catch(() => {
             const fallback = zones[0] || MONITORING_ZONES[0];
@@ -334,6 +373,8 @@ export default function App() {
             onOpenAlerts={() => setIsAlertsDrawerOpen(true)}
             isLiveApi={isLiveApi}
             lastSyncTime={lastSyncTime}
+            simulationScenario={scenario}
+            isLoading={isLoading}
           />
         </div>
       ) : (
@@ -480,8 +521,15 @@ export default function App() {
         distanceKm={distanceToNearestKm}
         userWeather={userWeather}
         isLoadingWeather={isLoadingUserWeather}
+        hlsScreen={hlsScreen}
+        hlsScreenMessage={hlsScreenMessage}
         onFocusZone={(z) => {
           setSelectedZone(z);
+          setCurrentView('DASHBOARD');
+          setMobileTab('MAP');
+        }}
+        onFocusMap={() => {
+          setCurrentView('DASHBOARD');
           setMobileTab('MAP');
         }}
         errorMsg={geoError}

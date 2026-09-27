@@ -10,16 +10,18 @@ interface HowItWorksModalProps {
 export const HowItWorksModal: React.FC<HowItWorksModalProps> = ({ isOpen, onClose }) => {
   const [testRainRate, setTestRainRate] = useState<number>(12); // mm/h
   const [test24hRain, setTest24hRain] = useState<number>(65); // mm
+  const [test72hRain, setTest72hRain] = useState<number>(90); // mm
   const [testSlope, setTestSlope] = useState<number>(32); // degrees
   const [testRiverKm, setTestRiverKm] = useState<number>(0.3); // km
   const [testSaturation, setTestSaturation] = useState<number>(75); // %
+  const [testElevationM, setTestElevationM] = useState<number>(780); // m
 
   if (!isOpen) return null;
 
-  const slopeMultiplier = Number((Math.pow(Math.max(5, testSlope) / 26, 1.65)).toFixed(2));
+  const slopeMultiplier = Number((Math.pow(Math.max(5, Math.min(50, testSlope)) / 26, 1.65)).toFixed(2));
   const satFactor = Number((1.0 + (testSaturation / 100) * 0.55).toFixed(2));
   const intensityLsi = testRainRate * 3.2;
-  const ante72h = test24hRain * 1.5 * 0.42; // estimated 72h
+  const ante72h = test72hRain * 0.42;
   const calculatedLsi = Math.min(
     100,
     Math.max(0, Math.round((intensityLsi + ante72h) * slopeMultiplier * satFactor * 0.45))
@@ -29,7 +31,9 @@ export const HowItWorksModal: React.FC<HowItWorksModalProps> = ({ isOpen, onClos
   const floodAccum = test24hRain * 0.68;
   const floodInt = testRainRate * 3.6;
   const riverFactor = Number(Math.max(0.6, 2.4 - testRiverKm * 0.55).toFixed(2));
-  const elevationFactor = 1.45; // baseline mid valley
+  const elevationFactor = Number(
+    Math.max(0.7, 2.0 - (Math.min(testElevationM, 1500) / 1200) * 0.85).toFixed(2)
+  );
   const calculatedFfi = Math.min(
     100,
     Math.max(0, Math.round((floodAccum + floodInt) * riverFactor * elevationFactor * 0.4))
@@ -56,11 +60,11 @@ export const HowItWorksModal: React.FC<HowItWorksModalProps> = ({ isOpen, onClos
                 <Calculator className="w-4 h-4" />
               </div>
               <h3 className="text-base font-bold text-stone-900">
-                Risk Engine & Formula Transparency
+                Risk formulas and model estimates
               </h3>
             </div>
             <p className="text-xs text-stone-500 font-medium mt-0.5">
-              Open-Meteo precipitation ingestion &amp; geophysical heuristic formulas.
+              How rainfall and terrain data become the scores shown in the dashboard.
             </p>
           </div>
           <button
@@ -84,6 +88,13 @@ export const HowItWorksModal: React.FC<HowItWorksModalProps> = ({ isOpen, onClos
             </p>
           </div>
 
+          <div className="p-4 rounded-xl border border-amber-200 bg-amber-50/70 space-y-1.5">
+            <h4 className="font-bold text-stone-900">About the model scores</h4>
+            <p className="text-[11px] text-stone-700 leading-relaxed">
+              The XGBoost score is trained on rainfall-threshold proxy labels, not recorded flood events, so it is not a calibrated flood probability. The HLS model estimates a source-data fraction whose meaning is undocumented and only covers the Guwahati grid. Neither score replaces official warnings.
+            </p>
+          </div>
+
           {/* Mathematical Formulations */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Landslide formula */}
@@ -97,7 +108,7 @@ export const HowItWorksModal: React.FC<HowItWorksModalProps> = ({ isOpen, onClos
               </div>
               <ul className="space-y-1.5 text-[11px] text-stone-600 list-disc list-inside">
                 <li>
-                  <strong className="text-stone-900">M<sub>slope</sub></strong> = (Slope / 26°)<sup>1.65</sup> — Exponential shear stress acceleration on slopes &gt; 25°.
+                  <strong className="text-stone-900">M<sub>slope</sub></strong> = (clamp(Slope, 5°, 50°) / 26°)<sup>1.65</sup>.
                 </li>
                 <li>
                   <strong className="text-stone-900">M<sub>sat</sub></strong> = 1 + (SoilSat / 100) &times; 0.55 — Pore-water pressure multiplier.
@@ -122,7 +133,7 @@ export const HowItWorksModal: React.FC<HowItWorksModalProps> = ({ isOpen, onClos
                   <strong className="text-stone-900">R<sub>river</sub></strong> = max(0.6, 2.4 &minus; Dist<sub>km</sub> &times; 0.55) — Alluvial bank overtop buffer.
                 </li>
                 <li>
-                  <strong className="text-stone-900">E<sub>elevation</sub></strong> = Valley convergence factor (lower basin collects water).
+                  <strong className="text-stone-900">E<sub>elevation</sub></strong> = max(0.7, 2.0 - min(Elevation, 1500) / 1200 &times; 0.85).
                 </li>
                 <li>
                   <strong className="text-stone-900">A<sub>24h</sub></strong> = 24-hour total precipitation runoff volume.
@@ -134,8 +145,11 @@ export const HowItWorksModal: React.FC<HowItWorksModalProps> = ({ isOpen, onClos
           {/* Severity Threshold Classification */}
           <div className="p-4 rounded-xl border border-stone-200/80 glass-card space-y-3 shadow-2xs">
             <h4 className="font-bold text-stone-900 text-xs uppercase tracking-wider">
-              Warm Tint Severity Thresholds (Anti-Traffic-Light Protocol)
+              Risk levels
             </h4>
+            <p className="text-[11px] text-stone-600">
+              24-hour IMD rainfall bands: Yellow &ge;64.5 mm, Orange &ge;115.6 mm, Red &ge;204.4 mm.
+            </p>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs">
               <div className="p-2.5 rounded-xl border border-amber-200 bg-amber-50/80 shadow-2xs">
                 <span className="font-bold text-amber-900 block">Low (0 - 29)</span>
@@ -203,6 +217,22 @@ export const HowItWorksModal: React.FC<HowItWorksModalProps> = ({ isOpen, onClos
 
               <div>
                 <label className="flex justify-between text-stone-700 font-semibold mb-1">
+                  <span>72-Hour Rainfall (A<sub>72h</sub>)</span>
+                  <span className="font-bold font-mono text-stone-900">{test72hRain} mm</span>
+                </label>
+                <input
+                  type="range"
+                  min="0"
+                  max="400"
+                  step="5"
+                  value={test72hRain}
+                  onChange={(e) => setTest72hRain(Number(e.target.value))}
+                  className="w-full accent-orange-600 cursor-pointer"
+                />
+              </div>
+
+              <div>
+                <label className="flex justify-between text-stone-700 font-semibold mb-1">
                   <span>Terrain Slope Steepness</span>
                   <span className="font-bold font-mono text-stone-900">{testSlope}°</span>
                 </label>
@@ -232,6 +262,38 @@ export const HowItWorksModal: React.FC<HowItWorksModalProps> = ({ isOpen, onClos
                   className="w-full accent-orange-600 cursor-pointer"
                 />
               </div>
+
+              <div>
+                <label className="flex justify-between text-stone-700 font-semibold mb-1">
+                  <span>Ground Elevation</span>
+                  <span className="font-bold font-mono text-stone-900">{testElevationM} m</span>
+                </label>
+                <input
+                  type="range"
+                  min="0"
+                  max="1500"
+                  step="25"
+                  value={testElevationM}
+                  onChange={(e) => setTestElevationM(Number(e.target.value))}
+                  className="w-full accent-orange-600 cursor-pointer"
+                />
+              </div>
+
+              <div>
+                <label className="flex justify-between text-stone-700 font-semibold mb-1">
+                  <span>Soil Saturation</span>
+                  <span className="font-bold font-mono text-stone-900">{testSaturation}%</span>
+                </label>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="1"
+                  value={testSaturation}
+                  onChange={(e) => setTestSaturation(Number(e.target.value))}
+                  className="w-full accent-orange-600 cursor-pointer"
+                />
+              </div>
             </div>
 
             {/* Calculated Output Score Card */}
@@ -258,7 +320,7 @@ export const HowItWorksModal: React.FC<HowItWorksModalProps> = ({ isOpen, onClos
         {/* Modal Footer */}
         <div className="p-4 border-t border-stone-200/80 flex items-center justify-between bg-stone-50/70">
           <span className="text-[11px] text-stone-500 font-medium">
-            Compliant with WMO (World Meteorological Organization) early warning frameworks.
+            Screening aid only. Follow official alerts and local authority instructions.
           </span>
           <button
             onClick={onClose}

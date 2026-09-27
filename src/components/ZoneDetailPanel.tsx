@@ -50,6 +50,7 @@ export const ZoneDetailPanel: React.FC<ZoneDetailPanelProps> = ({
   const palette = RISK_PALETTE[zone.assessment.overallLevel];
   const isHighOrSevere =
     zone.assessment.overallLevel === 'High' || zone.assessment.overallLevel === 'Severe';
+  const floodRiskModel = zone.fusion?.floodRiskModel;
 
   const dailyData = zone.weather.dailyHistory.map((item) => ({
     name: item.date,
@@ -293,6 +294,22 @@ export const ZoneDetailPanel: React.FC<ZoneDetailPanelProps> = ({
                 <span className="font-bold text-stone-900">&times;{zone.assessment.floodBreakdown.elevationFunnelMultiplier}</span>
               </div>
             </div>
+          </div>
+
+          <div className="p-3.5 rounded-xl border border-stone-200/80 glass-card">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-bold text-stone-900">XGBoost rainfall-risk proxy</span>
+              {floodRiskModel && (
+                <span className="text-xs font-bold text-stone-800">
+                  {floodRiskModel.riskPercent.toFixed(1)}% score
+                </span>
+              )}
+            </div>
+            <p className="text-[11px] text-stone-600 mt-1 leading-relaxed">
+              {floodRiskModel
+                ? floodRiskModel.scoreMeaning
+                : 'Model score unavailable; the formula-based flood index is shown above.'}
+            </p>
           </div>
 
           {/* Toggle Formula Breakdown */}

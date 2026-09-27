@@ -49,6 +49,8 @@ export const AlertBanner: React.FC<AlertBannerProps> = ({
   return (
     <div
       id="early-warning-alert-banner"
+      role="alert"
+      aria-live={isSevere ? 'assertive' : 'polite'}
       className={`border-b backdrop-blur-md transition-colors duration-200 ${
         isSevere
           ? 'bg-stone-950/92 text-white border-orange-500/50 shadow-md shadow-orange-950/10'
@@ -85,15 +87,20 @@ export const AlertBanner: React.FC<AlertBannerProps> = ({
                 &bull; Reported {currentAlert.timestamp}
               </span>
             </div>
-            <p className={`text-xs font-medium truncate mt-0.5 ${isSevere ? 'text-stone-300' : 'text-stone-700'}`}>
-              {currentAlert.headline} &mdash;{' '}
-              <span className="opacity-90 font-normal">{currentAlert.recommendation}</span>
+            <p className={`text-sm font-bold whitespace-normal break-words mt-1 ${isSevere ? 'text-white' : 'text-stone-900'}`}>
+              {currentAlert.headline}
+            </p>
+            <p className={`text-xs whitespace-normal break-words mt-1 ${isSevere ? 'text-stone-200' : 'text-stone-700'}`}>
+              <strong>Suggested action:</strong> {currentAlert.recommendation}
+            </p>
+            <p className={`text-[11px] mt-1 ${isSevere ? 'text-stone-300' : 'text-stone-600'}`}>
+              Follow official instructions from local authorities.
             </p>
           </div>
         </div>
 
         {/* Action buttons */}
-        <div className="flex items-center gap-2 self-end md:self-center shrink-0">
+        <div className="flex flex-wrap items-center gap-2 self-start md:self-center shrink-0">
           {alerts.length > 1 && (
             <div className="flex items-center gap-1 text-[11px] font-mono px-2.5 py-1 bg-black/10 backdrop-blur-xs rounded-lg border border-white/10 shadow-2xs">
               <span>
@@ -118,10 +125,12 @@ export const AlertBanner: React.FC<AlertBannerProps> = ({
 
           <button
             onClick={onOpenSmsSimulator}
+            aria-label="Open SMS demo"
+            title="SMS demo only; messages are not sent"
             className="tactile-btn flex items-center gap-1.5 px-2.5 py-1.5 bg-white/90 hover:bg-white text-stone-900 rounded-lg font-semibold text-[11px] transition shadow-2xs border border-stone-200/80 cursor-pointer"
           >
             <Radio className="w-3.5 h-3.5 text-orange-600" />
-            <span className="hidden sm:inline">Simulate SMS</span>
+            <span>SMS demo</span>
           </button>
 
           <button
@@ -129,13 +138,14 @@ export const AlertBanner: React.FC<AlertBannerProps> = ({
             onClick={() => onSelectZoneById(currentAlert.zoneId)}
             className="tactile-btn flex items-center gap-1 px-3 py-1.5 bg-gradient-to-b from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-lg font-semibold text-[11px] transition shadow-xs border border-orange-400/40 cursor-pointer"
           >
-            <span>Inspect Zone</span>
+            <span>View area</span>
             <ChevronRight className="w-3.5 h-3.5" />
           </button>
 
           <button
             onClick={() => setIsDismissed(true)}
-            title="Dismiss Alert Banner"
+            title="Dismiss alert"
+            aria-label="Dismiss alert"
             className="p-1 rounded-lg hover:bg-black/10 transition opacity-70 hover:opacity-100 cursor-pointer"
           >
             <X className="w-4 h-4" />
