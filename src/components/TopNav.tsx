@@ -30,14 +30,14 @@ export const TopNav: React.FC<TopNavProps> = ({
   isLocating,
 }) => {
   return (
-    <header className="glass-dock sticky top-0 z-30 px-4 py-2 border-b">
+    <header className="glass-dock sticky top-0 z-30 px-4 py-2 border-b rounded-b-2xl">
       <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div>
             <div className="flex items-center gap-2">
               <button
                 onClick={() => onViewChange && onViewChange('LANDING')}
-                className="text-base font-bold tracking-tight text-stone-900 leading-none hover:text-orange-700 transition cursor-pointer text-left"
+                className="text-base font-bold text-[#193c38] leading-none hover:text-emerald-700 transition cursor-pointer text-left"
               >
                 JALRAKSHAK
               </button>

@@ -65,12 +65,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     : null;
 
   return (
-    <div id="jalrakshak-landing-page" className="min-h-full flex flex-col bg-stone-50/50">
-      <section className="relative overflow-hidden pt-10 pb-16 px-4 sm:px-6 lg:px-8 border-b border-stone-200/80">
-        {/* Subtle decorative background gradient glows */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-96 bg-gradient-to-b from-orange-100/40 via-amber-50/20 to-transparent pointer-events-none -z-10 blur-3xl" />
-
-        <div className="max-w-5xl mx-auto text-center space-y-6">
+    <div id="jalrakshak-landing-page" className="min-h-full flex flex-col bg-[#f3f7f3]">
+      <section className="relative overflow-hidden pt-10 pb-14 px-4 sm:px-6 lg:px-8 border-b border-emerald-900/10 bg-[linear-gradient(115deg,#eef6f0_0%,#f7f7ee_58%,#f8eee8_100%)]">
+        <div className="max-w-6xl mx-auto space-y-6">
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/80 border border-stone-200/80 shadow-2xs text-xs font-semibold text-stone-700 backdrop-blur-md">
             <span className={`w-2 h-2 rounded-full ${simulationScenario !== 'LIVE' || isLoading ? 'bg-amber-500 animate-pulse' : isLiveApi ? 'bg-emerald-600' : 'bg-stone-400'}`} />
             <span className="text-stone-900 font-bold">
@@ -87,15 +84,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             )}
           </div>
 
-          <div className="space-y-3">
-            <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-stone-950 leading-[1.15]">
-              Rain and flood alerts for{' '}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-600 via-amber-600 to-orange-700">
-                Assam
-              </span>
+          <div className="space-y-3 max-w-3xl">
+            <h1 className="text-3xl sm:text-5xl font-extrabold text-[#193c38] leading-tight">
+              A clearer picture of rain and flood risk in <span className="text-emerald-700">Assam</span>
             </h1>
-            <p className="max-w-2xl mx-auto text-sm sm:text-base text-stone-600 leading-relaxed">
-              Check conditions near you, see which areas need attention, and find the next recommended step.
+            <p className="max-w-2xl text-sm sm:text-base text-stone-600 leading-relaxed">
+              Local weather, area reports and practical next steps, together in one place.
             </p>
           </div>
 
@@ -186,15 +180,15 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       <section className="py-12 px-4 sm:px-6 lg:px-8 max-w-6xl mx-auto w-full space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
           <div>
-            <div className="flex items-center gap-2 text-xs font-bold text-orange-700 uppercase tracking-wider">
+            <div className="flex items-center gap-2 text-xs font-bold text-emerald-800 uppercase tracking-wider">
               <Layers className="w-4 h-4" />
               <span>Current conditions</span>
             </div>
-            <h2 className="text-2xl font-black text-stone-950 mt-1">
-              Areas we monitor
+            <h2 className="text-2xl font-black text-[#193c38] mt-1">
+              Conditions around Assam
             </h2>
             <p className="text-xs text-stone-600 mt-0.5">
-              Select an area to see rainfall, risk level, and recommended actions.
+              Choose an area for its latest rainfall and risk details.
             </p>
           </div>
 
@@ -279,15 +273,15 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       {/* Core Architectural Pillars */}
       <section className="py-12 px-4 sm:px-6 lg:px-8 border-y border-stone-200/80 bg-white/60 backdrop-blur-md">
         <div className="max-w-6xl mx-auto space-y-8">
-          <div className="text-center max-w-2xl mx-auto space-y-2">
-            <span className="text-xs font-bold text-orange-700 uppercase tracking-wider">
-              Engineering Architecture
+          <div className="max-w-2xl space-y-2">
+            <span className="text-xs font-bold text-emerald-800 uppercase tracking-wider">
+              How we assess conditions
             </span>
-            <h2 className="text-2xl sm:text-3xl font-black text-stone-950">
-              Coupling Atmospheric Feeds with Geomorphology
+            <h2 className="text-2xl sm:text-3xl font-black text-[#193c38]">
+              Rain, rivers and the shape of the land
             </h2>
             <p className="text-xs sm:text-sm text-stone-600 leading-relaxed font-medium">
-              JALRAKSHAK does not rely on subjective estimates. It computes physical hazard thresholds via two interconnected scientific indices.
+              We bring together weather and terrain signals to help show where conditions may need attention.
             </p>
           </div>
 

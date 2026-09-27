@@ -334,7 +334,7 @@ export default function App() {
   };
 
   return (
-    <div className="flex flex-col h-screen max-h-screen w-full overflow-hidden bg-stone-50 text-stone-900 font-sans selection:bg-orange-100 selection:text-orange-950">
+    <div className="flex flex-col h-screen max-h-screen w-full overflow-hidden bg-[#f3f7f3] text-[#193c38] font-sans selection:bg-emerald-100 selection:text-emerald-950">
       {/* Top Header */}
       <TopNav
         currentView={currentView}
