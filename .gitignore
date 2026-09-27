@@ -9,3 +9,4 @@ coverage/
 backend/data/
 __pycache__/
 *.py[cod]
+.venv
