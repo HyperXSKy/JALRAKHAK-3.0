@@ -35,6 +35,7 @@ export interface WeatherRainfallData {
   }[];
   lastUpdated: string;
   isLive: boolean;
+  dataQuality?: 'live' | 'simulated' | 'unavailable';
   weatherDescription: string;
   temperatureC?: number;
   humidityPercent?: number;
@@ -74,9 +75,29 @@ export interface RiskAssessment {
   thresholdsTriggered: string[];
 }
 
+export interface FloodRiskModelOutput {
+  probability: number;
+  riskPercent: number;
+  level: RiskLevel;
+  decisionThreshold: number;
+  scoreMeaning: string;
+  observedEventProbability: false;
+  model: {
+    labelDefinition?: string;
+    chronologicalHoldout?: {
+      precision?: number;
+      recall?: number;
+      f1?: number;
+    };
+  };
+}
+
 export interface ZoneWithTelemetry extends Zone {
   weather: WeatherRainfallData;
   assessment: RiskAssessment;
+  fusion?: {
+    floodRiskModel?: FloodRiskModelOutput;
+  };
 }
 
 export interface EarlyWarningAlert {

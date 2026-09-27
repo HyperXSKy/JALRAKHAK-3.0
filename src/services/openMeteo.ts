@@ -18,7 +18,7 @@ export async function fetchZoneWeather(
 
   // Live Open-Meteo API Call
   const [lat, lng] = zone.center;
-  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(4)}&longitude=${lng.toFixed(4)}&current=precipitation,rain,showers,weather_code,temperature_2m,relative_humidity_2m,wind_speed_10m&hourly=precipitation,rain,precipitation_probability&daily=precipitation_sum,precipitation_hours&past_days=7&forecast_days=7&timezone=auto`;
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(4)}&longitude=${lng.toFixed(4)}&current=precipitation,rain,showers,weather_code,temperature_2m,relative_humidity_2m,wind_speed_10m&hourly=precipitation,rain,precipitation_probability,temperature_2m,relative_humidity_2m,wind_speed_10m&daily=precipitation_sum,precipitation_hours&past_days=7&forecast_days=7&timezone=auto`;
 
   try {
     const controller = new AbortController();
@@ -36,9 +36,6 @@ export async function fetchZoneWeather(
     const currentPrecip = Number(
       (data.current?.precipitation ?? data.current?.rain ?? 0).toFixed(1)
     );
-    const temperatureC = data.current?.temperature_2m != null ? Number(data.current.temperature_2m.toFixed(1)) : undefined;
-    const humidityPercent = data.current?.relative_humidity_2m != null ? Math.round(data.current.relative_humidity_2m) : undefined;
-    const windSpeedKmh = data.current?.wind_speed_10m != null ? Number(data.current.wind_speed_10m.toFixed(1)) : undefined;
     const stationElevationM = data.elevation != null ? Math.round(data.elevation) : undefined;
     const generationTimeMs = data.generationtime_ms != null ? Number(data.generationtime_ms.toFixed(1)) : undefined;
     const liveIsoTimestamp = data.current?.time || new Date().toISOString();
@@ -48,6 +45,9 @@ export async function fetchZoneWeather(
     const hourlyPrecip: number[] = data.hourly?.precipitation || [];
     const hourlyRain: number[] = data.hourly?.rain || [];
     const hourlyProb: number[] = data.hourly?.precipitation_probability || [];
+    const hourlyTemperatures: number[] = data.hourly?.temperature_2m || [];
+    const hourlyHumidities: number[] = data.hourly?.relative_humidity_2m || [];
+    const hourlyWinds: number[] = data.hourly?.wind_speed_10m || [];
 
     // Find current index based on local station timestamp returned by Open-Meteo
     let currentIndex = -1;
@@ -59,6 +59,13 @@ export async function fetchZoneWeather(
       // Fallback to center of 7-day past interval
       currentIndex = Math.min(168, Math.max(0, Math.floor(hourlyTimes.length / 2)));
     }
+
+    const temperatureValue = data.current?.temperature_2m ?? hourlyTemperatures[currentIndex];
+    const humidityValue = data.current?.relative_humidity_2m ?? hourlyHumidities[currentIndex];
+    const windValue = data.current?.wind_speed_10m ?? hourlyWinds[currentIndex];
+    const temperatureC = temperatureValue != null ? Number(temperatureValue.toFixed(1)) : undefined;
+    const humidityPercent = humidityValue != null ? Math.round(humidityValue) : undefined;
+    const windSpeedKmh = windValue != null ? Number(windValue.toFixed(1)) : undefined;
 
     // Last 24 hours precipitation sum
     const past24Start = Math.max(0, currentIndex - 24);
@@ -115,8 +122,8 @@ export async function fetchZoneWeather(
       last24hMm,
       last72hMm,
       forecastNext24hMm,
-      hourlyForecast: hourlyForecast.length > 0 ? hourlyForecast : generateDefaultHourly(),
-      dailyHistory: dailyHistory.length > 0 ? dailyHistory : generateDefaultDaily(),
+      hourlyForecast,
+      dailyHistory,
       lastUpdated: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
       isLive: true,
       weatherDescription,
@@ -128,8 +135,8 @@ export async function fetchZoneWeather(
       liveIsoTimestamp,
     };
   } catch (err) {
-    console.warn(`Open-Meteo live request failed for ${zone.name}, applying realistic hydrological telemetry:`, err);
-    return generateScenarioData(zone, 'LIVE_FALLBACK');
+    console.warn(`Open-Meteo live request failed for ${zone.name}:`, err);
+    throw new Error(`Live weather unavailable for ${zone.name}`);
   }
 }
 
@@ -141,7 +148,7 @@ export async function fetchLivePointWeather(
   lng: number,
   label: string = 'User Location'
 ): Promise<WeatherRainfallData> {
-  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(4)}&longitude=${lng.toFixed(4)}&current=precipitation,rain,showers,weather_code,temperature_2m,relative_humidity_2m,wind_speed_10m&hourly=precipitation,rain,precipitation_probability&daily=precipitation_sum,precipitation_hours&past_days=7&forecast_days=7&timezone=auto`;
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(4)}&longitude=${lng.toFixed(4)}&current=precipitation,rain,showers,weather_code,temperature_2m,relative_humidity_2m,wind_speed_10m&hourly=precipitation,rain,precipitation_probability,temperature_2m,relative_humidity_2m,wind_speed_10m&daily=precipitation_sum,precipitation_hours&past_days=7&forecast_days=7&timezone=auto`;
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 8000);
@@ -221,8 +228,8 @@ export async function fetchLivePointWeather(
     last24hMm,
     last72hMm,
     forecastNext24hMm,
-    hourlyForecast: hourlyForecast.length > 0 ? hourlyForecast : generateDefaultHourly(),
-    dailyHistory: dailyHistory.length > 0 ? dailyHistory : generateDefaultDaily(),
+    hourlyForecast,
+    dailyHistory,
     lastUpdated: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
     isLive: true,
     weatherDescription,
@@ -249,7 +256,7 @@ function getWeatherDescription(code: number, rainMm: number): string {
 
 function generateScenarioData(
   zone: Zone,
-  scenario: 'CLOUDBURST' | 'MONSOON_SURGE' | 'DRY_BASELINE' | 'LIVE_FALLBACK'
+  scenario: 'CLOUDBURST' | 'MONSOON_SURGE' | 'DRY_BASELINE'
 ): WeatherRainfallData {
   const isCloudburstZone = zone.slope >= 30 || zone.riverProximityKm <= 0.3;
 
@@ -285,13 +292,6 @@ function generateScenarioData(
     last72h = 5.4;
     forecastNext24h = 1.0;
     desc = 'Dry Conditions / Clear Drainage';
-  } else {
-    // Realistic fallback based on geography
-    currentRate = Number((Math.random() * 4.5).toFixed(1));
-    last24h = Number((22.0 + Math.random() * 35).toFixed(1));
-    last72h = Number((last24h + 20 + Math.random() * 30).toFixed(1));
-    forecastNext24h = Number((15.0 + Math.random() * 25).toFixed(1));
-    desc = 'Regional Radar Live Proxy';
   }
 
   const hourlyForecast = [];
@@ -313,7 +313,7 @@ function generateScenarioData(
   for (let i = 0; i < 12; i++) {
     const isForecast = i >= 7;
     const baseRain = isForecast ? forecastNext24h / 2 : last72h / 4;
-    const rain = Math.max(0, Number((baseRain * (0.5 + Math.random())).toFixed(1)));
+    const rain = Math.max(0, Number((baseRain * (0.8 + (i % 3) * 0.1)).toFixed(1)));
     dailyHistory.push({
       date: `Day ${i + 1}`,
       rainfallMm: rain,
@@ -332,31 +332,4 @@ function generateScenarioData(
     isLive: false,
     weatherDescription: desc,
   };
-}
-
-function generateDefaultHourly() {
-  const arr = [];
-  for (let i = 0; i < 24; i++) {
-    arr.push({
-      time: `+${i}h`,
-      precipitationMm: 0,
-      rainMm: 0,
-      probability: 10,
-    });
-  }
-  return arr;
-}
-
-function generateDefaultDaily() {
-  return [
-    { date: 'Day 1', rainfallMm: 8.2, isForecast: false },
-    { date: 'Day 2', rainfallMm: 12.4, isForecast: false },
-    { date: 'Day 3', rainfallMm: 19.1, isForecast: false },
-    { date: 'Day 4', rainfallMm: 34.0, isForecast: false },
-    { date: 'Day 5', rainfallMm: 22.5, isForecast: false },
-    { date: 'Day 6', rainfallMm: 15.2, isForecast: false },
-    { date: 'Day 7', rainfallMm: 28.3, isForecast: false },
-    { date: 'Day 8 (Fcst)', rainfallMm: 18.0, isForecast: true },
-    { date: 'Day 9 (Fcst)', rainfallMm: 14.5, isForecast: true },
-  ];
 }

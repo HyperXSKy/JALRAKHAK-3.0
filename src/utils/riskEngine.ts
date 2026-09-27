@@ -73,7 +73,7 @@ export const RISK_PALETTE: Record<RiskLevel, RiskStyleInfo> = {
     mapFill: '#9A3412', // Deep red-orange
     mapStroke: '#7C2D12',
     cardBorder: 'border-orange-600',
-    description: 'Imminent catastrophic failure or rapid flash flooding. Evacuation in effect.',
+    description: 'Very high estimated hazard. Check official alerts and follow local instructions.',
   },
 };
 
@@ -138,12 +138,15 @@ export function calculateZoneRisk(zone: Zone, weather: WeatherRainfallData): Ris
     thresholdsTriggered.push('Rain Intensity > 7.5 mm/h');
   }
 
-  if (rain24h >= 100) {
-    activeAdvisories.push(`Extreme 24-hr accumulation: ${rain24h.toFixed(1)} mm`);
-    thresholdsTriggered.push('24h Accumulation > 100 mm');
-  } else if (rain24h >= 60) {
-    activeAdvisories.push(`Significant 24-hr accumulation: ${rain24h.toFixed(1)} mm`);
-    thresholdsTriggered.push('24h Accumulation > 60 mm');
+  if (rain24h >= 204.4) {
+    activeAdvisories.push(`IMD Red 24-hour rainfall threshold exceeded (${rain24h.toFixed(1)} mm)`);
+    thresholdsTriggered.push('24h rainfall >= 204.4 mm');
+  } else if (rain24h >= 115.6) {
+    activeAdvisories.push(`IMD Orange 24-hour rainfall threshold exceeded (${rain24h.toFixed(1)} mm)`);
+    thresholdsTriggered.push('24h rainfall >= 115.6 mm');
+  } else if (rain24h >= 64.5) {
+    activeAdvisories.push(`IMD Yellow 24-hour rainfall threshold exceeded (${rain24h.toFixed(1)} mm)`);
+    thresholdsTriggered.push('24h rainfall >= 64.5 mm');
   }
 
   if (landslideScore >= 60 && zone.slope >= 28) {
@@ -166,7 +169,7 @@ export function calculateZoneRisk(zone: Zone, weather: WeatherRainfallData): Ris
   } else if (overallLevel === 'High') {
     recommendedAction = 'Stage emergency personnel; restrict mountain passes; prepare low-lying populations for immediate staging.';
   } else if (overallLevel === 'Severe') {
-    recommendedAction = 'EXECUTE IMMEDIATE EVACUATION. Halt transit through valley corridors and unstable slopes.';
+    recommendedAction = 'Check official evacuation instructions. Avoid marked flood corridors and unstable slopes.';
   }
 
   return {

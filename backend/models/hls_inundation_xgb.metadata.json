@@ -1,0 +1,169 @@
+{
+  "model": "XGBoost HLS positive-fraction regressor",
+  "selectedCandidate": "square_d5_current",
+  "selectedParameters": {
+    "eval_metric": "rmse",
+    "tree_method": "hist",
+    "nthread": 4,
+    "seed": 26071,
+    "verbosity": 0,
+    "max_depth": 5,
+    "eta": 0.04,
+    "subsample": 0.85,
+    "colsample_bytree": 0.9,
+    "min_child_weight": 8,
+    "lambda": 8.0,
+    "objective": "reg:squarederror"
+  },
+  "validationTuningCandidates": [
+    {
+      "name": "square_d4",
+      "bestIteration": 899,
+      "mae": 0.15261,
+      "rmse": 0.22847,
+      "r2": 0.12725,
+      "validationSelectionScore": 0.38108
+    },
+    {
+      "name": "square_d5_current",
+      "bestIteration": 899,
+      "mae": 0.14542,
+      "rmse": 0.21985,
+      "r2": 0.19181,
+      "validationSelectionScore": 0.36527
+    },
+    {
+      "name": "huber_d4",
+      "bestIteration": 899,
+      "mae": 0.15123,
+      "rmse": 0.22865,
+      "r2": 0.12584,
+      "validationSelectionScore": 0.37988
+    },
+    {
+      "name": "huber_d5",
+      "bestIteration": 899,
+      "mae": 0.14485,
+      "rmse": 0.22399,
+      "r2": 0.16111,
+      "validationSelectionScore": 0.36884
+    }
+  ],
+  "externalBaselineReference": {
+    "source": "User-provided Drive checkpoint JSON; underlying model/config unavailable for direct scoring.",
+    "metrics": {
+      "mae": 0.140028,
+      "rmse": 0.202381,
+      "r2": -0.138399,
+      "precision": 0.194497,
+      "recall": 0.727588,
+      "f1": 0.306943
+    },
+    "comparisonCaveat": "Baseline split, target transform, features, and threshold could not be verified; these metrics are reference-only and not a controlled comparison."
+  },
+  "target": "Continuous HLS CSV mean in [0, 1], retained without binarization",
+  "targetCaveat": "The source files do not document the semantic meaning of mean. The model predicts that source fraction, not confirmed inundated area or flood-event probability.",
+  "intendedUse": "Experimental Guwahati spatial inundation/water-signal screening; not an operational warning without independent event labels and local validation.",
+  "dataSource": "Shared Guwahati HLS spatial-label CSV batches; rainfall from Open-Meteo Archive and terrain from SRTM-derived Terrarium DEM tiles.",
+  "period": {
+    "start": "2023-04-01",
+    "end": "2024-12-26",
+    "uniqueDates": 159
+  },
+  "dataQuality": {
+    "batchFiles": 17,
+    "uniqueLabeledRowsBeforeTestExclusion": 328807,
+    "providedTestLabeledRows": 4732,
+    "providedTestRowsDuplicatedInBatchesAndExcluded": 4732,
+    "duplicateBatchRows": 0,
+    "conflictingDuplicateLabels": 0,
+    "rowsWithoutValidFraction": 597104,
+    "trainingRows": 324075,
+    "positiveRows": 91871,
+    "fractionalTargetRows": 87317,
+    "fullPositiveTargetRows": 4554,
+    "meanTargetFraction": 0.087889,
+    "gridCells": 5751
+  },
+  "features": [
+    "latitude",
+    "longitude",
+    "elevation_m",
+    "slope_degrees",
+    "rain_24h_mm",
+    "rain_72h_mm",
+    "rain_7d_mm",
+    "humidity_24h_percent",
+    "day_of_year_sin",
+    "day_of_year_cos"
+  ],
+  "terrainSource": "SRTM-derived Terrarium elevation tiles from AWS elevation-tiles-prod at zoom 12; slope derived from neighboring HLS grid elevations.",
+  "rainfallSource": "Open-Meteo Archive at the Guwahati grid centroid, hourly rainfall accumulated before 12:00 UTC on each label date.",
+  "split": {
+    "method": "Geographic blocks approximately 2.5 km wide; 20% of blocks held out; model/cutoff selected on later dates from remaining blocks.",
+    "validationStart": "2024-09-07",
+    "spatialHoldoutCellCount": 474,
+    "developmentCellCount": 1892,
+    "trainRows": 202176,
+    "validationRows": 54110,
+    "spatialHoldoutRows": 67789,
+    "finalEstimators": 900
+  },
+  "highFractionCutoff": 0.1783,
+  "candidateSelection": "Minimum validation MAE + RMSE; early stopping uses validation RMSE to avoid a low-tree MAE-only underfit.",
+  "cutoffDefinition": "Validation-tuned screen for source HLS fractions >= 0.5; not a calibrated probability or warning threshold.",
+  "validationMetrics": {
+    "rows": 54110,
+    "meanObservedFraction": 0.12004,
+    "meanPredictedFraction": 0.12188,
+    "mae": 0.14542,
+    "rmse": 0.21985,
+    "r2": 0.19181,
+    "meanBaselineMae": 0.17292,
+    "highFractionScreen": {
+      "cutoff": 0.1783,
+      "actualFractionCutoff": 0.5,
+      "highFractionRows": 5405,
+      "precision": 0.256,
+      "recall": 0.6431,
+      "f1": 0.3662,
+      "f2": 0.4938,
+      "truePositive": 3476,
+      "falsePositive": 10103,
+      "falseNegative": 1929
+    }
+  },
+  "spatialHoldoutMetrics": {
+    "rows": 67789,
+    "meanObservedFraction": 0.07925,
+    "meanPredictedFraction": 0.09021,
+    "mae": 0.09975,
+    "rmse": 0.17522,
+    "r2": 0.23647,
+    "meanBaselineMae": 0.12458,
+    "highFractionScreen": {
+      "cutoff": 0.1783,
+      "actualFractionCutoff": 0.5,
+      "highFractionRows": 4291,
+      "precision": 0.2258,
+      "recall": 0.6514,
+      "f1": 0.3354,
+      "f2": 0.4731,
+      "truePositive": 2795,
+      "falsePositive": 9582,
+      "falseNegative": 1496
+    }
+  },
+  "featureImportanceGain": {
+    "day_of_year_sin": 3.841166,
+    "humidity_24h_percent": 3.13714,
+    "day_of_year_cos": 2.406317,
+    "rain_24h_mm": 2.395119,
+    "rain_72h_mm": 2.219787,
+    "rain_7d_mm": 2.192866,
+    "elevation_m": 1.730029,
+    "latitude": 1.686549,
+    "longitude": 1.527061,
+    "slope_degrees": 1.133857
+  }
+}

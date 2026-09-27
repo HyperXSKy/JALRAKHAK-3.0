@@ -2,6 +2,7 @@ import React from 'react';
 import { X, MapPin, Navigation, ArrowRight, ShieldAlert, CloudRain, AlertCircle } from 'lucide-react';
 import { ZoneWithTelemetry, WeatherRainfallData } from '../types';
 import { RISK_PALETTE } from '../utils/riskEngine';
+import { HLSInundationScreenResponse } from '../services/backend';
 
 interface CheckAreaModalProps {
   isOpen: boolean;
@@ -10,10 +11,13 @@ interface CheckAreaModalProps {
   nearestZone: ZoneWithTelemetry | null;
   distanceKm: number | null;
   onFocusZone: (zone: ZoneWithTelemetry) => void;
+  onFocusMap: () => void;
   errorMsg: string | null;
   onRetry: () => void;
   userWeather?: WeatherRainfallData | null;
   isLoadingWeather?: boolean;
+  hlsScreen?: HLSInundationScreenResponse | null;
+  hlsScreenMessage?: string | null;
 }
 
 export const CheckAreaModal: React.FC<CheckAreaModalProps> = ({
@@ -23,12 +27,16 @@ export const CheckAreaModal: React.FC<CheckAreaModalProps> = ({
   nearestZone,
   distanceKm,
   onFocusZone,
+  onFocusMap,
   errorMsg,
   onRetry,
   userWeather,
   isLoadingWeather = false,
+  hlsScreen,
+  hlsScreenMessage,
 }) => {
   if (!isOpen) return null;
+  const floodRiskModel = hlsScreen?.floodRiskModel ?? nearestZone?.fusion?.floodRiskModel;
 
   return (
     <div
@@ -42,8 +50,8 @@ export const CheckAreaModal: React.FC<CheckAreaModalProps> = ({
               <MapPin className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-stone-900">Real-Time Local Area Telemetry</h3>
-              <p className="text-[11px] text-stone-500 font-medium">Live GPS &amp; Open-Meteo Atmosphere Query</p>
+              <h3 className="text-sm font-bold text-stone-900">Weather near you</h3>
+              <p className="text-[11px] text-stone-500 font-medium">Local conditions and nearest monitored area</p>
             </div>
           </div>
           <button
@@ -59,14 +67,14 @@ export const CheckAreaModal: React.FC<CheckAreaModalProps> = ({
             <div className="p-4 bg-amber-50/80 border border-amber-200/80 rounded-xl text-amber-950 space-y-2.5 shadow-2xs">
               <div className="flex items-center gap-2 font-bold">
                 <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
-                <span>Geolocation Notice</span>
+                <span>Location unavailable</span>
               </div>
               <p className="text-xs text-amber-900/90 leading-relaxed">{errorMsg}</p>
               <button
                 onClick={onRetry}
                 className="tactile-btn px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-bold text-xs transition cursor-pointer"
               >
-                Retry Location Request
+                Try again
               </button>
             </div>
           ) : userCoords ? (
@@ -75,36 +83,35 @@ export const CheckAreaModal: React.FC<CheckAreaModalProps> = ({
               <div className="flex items-center justify-between p-3 glass-card border border-stone-200/80 rounded-xl text-xs">
                 <span className="text-stone-600 font-medium flex items-center gap-2">
                   <Navigation className="w-3.5 h-3.5 text-orange-600" />
-                  Your Detected GPS Position:
+                  Detected Location:
                 </span>
                 <span className="font-mono font-bold text-stone-900 bg-white/80 px-2.5 py-0.5 rounded-md border border-stone-200/60">
                   {typeof userCoords.lat === 'number' && !isNaN(userCoords.lat)
                     ? userCoords.lat.toFixed(4)
-                    : '0.0000'}
+                    : 'Unavailable'}
                   °,{' '}
                   {typeof userCoords.lng === 'number' && !isNaN(userCoords.lng)
                     ? userCoords.lng.toFixed(4)
-                    : '0.0000'}
+                    : 'Unavailable'}
                   °
                 </span>
               </div>
 
-              {/* Exact Point Live Weather from Open-Meteo */}
               <div className="p-3.5 glass-card border border-stone-200/80 rounded-xl space-y-2.5">
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] uppercase font-bold text-stone-600 flex items-center gap-1.5">
                     <span className="w-2 h-2 rounded-full bg-orange-600 animate-ping" />
-                    Live Meteorological Feed at Coordinates
+                    Weather at your location
                   </span>
                   <span className="text-[10px] text-stone-400 font-mono font-medium">
-                    Open-Meteo Live API
+                    Live weather
                   </span>
                 </div>
 
                 {isLoadingWeather ? (
                   <div className="py-5 text-center text-stone-500">
                     <CloudRain className="w-5 h-5 mx-auto animate-bounce text-orange-600 mb-1.5" />
-                    Fetching real-time precipitation radar &amp; atmospheric sensors...
+                    Checking local weather...
                   </div>
                 ) : userWeather ? (
                   <div className="space-y-2.5">
@@ -145,16 +152,57 @@ export const CheckAreaModal: React.FC<CheckAreaModalProps> = ({
                     </div>
                   </div>
                 ) : (
-                  <p className="text-stone-500 text-[11px]">Direct radar readings synchronized.</p>
+                  <p className="text-stone-500 text-[11px]">Local weather details are unavailable right now.</p>
                 )}
               </div>
+
+              <div className="p-3.5 glass-card border border-stone-200/80 rounded-xl space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-bold text-stone-800">HLS model screening</span>
+                  {hlsScreen && (
+                    <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${hlsScreen.screenPositive ? 'bg-amber-100 text-amber-900' : 'bg-stone-100 text-stone-700'}`}>
+                      {hlsScreen.screenPositive ? 'Elevated signal' : 'No elevated signal'}
+                    </span>
+                  )}
+                </div>
+                {isLoadingWeather ? (
+                  <p className="text-[11px] text-stone-500">Checking the model for this location...</p>
+                ) : hlsScreen ? (
+                  <>
+                    <p className="text-sm font-bold text-stone-900">
+                      Estimated HLS fraction: {(hlsScreen.estimatedHlsFraction * 100).toFixed(1)}%
+                    </p>
+                    <p className="text-[11px] text-stone-600 leading-relaxed">
+                      This is a satellite-label screening estimate, not a flood probability or an official warning. The model covers Guwahati only.
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-[11px] text-stone-600 leading-relaxed">
+                    {hlsScreenMessage || 'No model estimate is available for this location.'}
+                  </p>
+                )}
+              </div>
+
+              {floodRiskModel && (
+                <div className="p-3.5 glass-card border border-stone-200/80 rounded-xl space-y-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-bold text-stone-800">XGBoost rainfall-risk proxy</span>
+                    <span className="text-xs font-bold text-stone-900">
+                      {floodRiskModel.riskPercent.toFixed(1)}% score
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-stone-600 leading-relaxed">
+                    Based on the {('nearestZoneName' in floodRiskModel && floodRiskModel.nearestZoneName) || nearestZone?.name || 'nearest monitored area'} profile. Trained on rainfall-threshold labels, not observed floods; this is not a calibrated flood probability.
+                  </p>
+                </div>
+              )}
 
               {/* Nearest Zone Card */}
               {nearestZone && (
                 <div className="p-4 border border-stone-200/80 rounded-xl glass-card space-y-3 shadow-2xs">
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] uppercase font-bold tracking-wider text-stone-500">
-                      Nearest Monitored Watershed Catchment
+                      Nearest monitored area
                     </span>
                     <span className="text-xs font-bold text-orange-600 font-mono bg-orange-50 px-2 py-0.5 rounded-full border border-orange-200/60">
                       {distanceKm != null ? `${distanceKm.toFixed(1)} km away` : ''}
@@ -171,7 +219,7 @@ export const CheckAreaModal: React.FC<CheckAreaModalProps> = ({
                     const palette = RISK_PALETTE[nearestZone.assessment.overallLevel];
                     return (
                       <div className="flex items-center justify-between p-2.5 rounded-xl border bg-white/70 border-stone-200/70 shadow-2xs">
-                        <span className="text-xs text-stone-600 font-medium">Watershed Hazard Status:</span>
+                        <span className="text-xs text-stone-600 font-medium">Risk level:</span>
                         <span
                           className={`px-2.5 py-0.5 rounded-full text-xs font-bold border shadow-2xs ${palette.badgeBg} ${palette.badgeText} ${palette.badgeBorder}`}
                         >
@@ -197,28 +245,32 @@ export const CheckAreaModal: React.FC<CheckAreaModalProps> = ({
                   </div>
 
                   <p className="text-xs text-stone-700 bg-white/70 p-2.5 rounded-xl border border-stone-200/70 leading-relaxed shadow-2xs">
-                    <strong className="text-stone-900">Action:</strong> {nearestZone.assessment.recommendedAction}
+                    <strong className="text-stone-900">Suggested action:</strong> {nearestZone.assessment.recommendedAction}
+                  </p>
+                  <p className="text-[11px] text-stone-600">
+                    Follow official instructions from local authorities.
                   </p>
 
-                  <button
-                    onClick={() => {
-                      onFocusZone(nearestZone);
-                      onClose();
-                    }}
-                    className="tactile-btn w-full py-2.5 px-3 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition shadow-sm cursor-pointer"
-                  >
-                    <span>Focus this Sector on Map</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </button>
                 </div>
               )}
+              <button
+                onClick={() => {
+                  if (nearestZone) onFocusZone(nearestZone);
+                  else onFocusMap();
+                  onClose();
+                }}
+                className="tactile-btn w-full py-2.5 px-3 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition shadow-sm cursor-pointer"
+              >
+                <span>{nearestZone ? 'View area on map' : 'View my location on map'}</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
             </div>
           ) : (
             <div className="text-center py-8">
               <Navigation className="w-8 h-8 text-orange-600 animate-spin mx-auto mb-2" />
-              <p className="text-xs font-bold text-stone-800">Acquiring GPS coordinates...</p>
+              <p className="text-xs font-bold text-stone-800">Finding your location...</p>
               <p className="text-[11px] text-stone-500 mt-1">
-                Calculating geodesic distance to real-time monitored catchments.
+                Checking nearby monitored areas.
               </p>
             </div>
           )}

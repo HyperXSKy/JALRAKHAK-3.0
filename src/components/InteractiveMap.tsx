@@ -81,11 +81,8 @@ interface InteractiveMapProps {
   userLocation: { lat: number; lng: number } | null;
   filterHazard: 'ALL' | 'HIGH_SEVERE' | 'LANDSLIDE' | 'FLOOD';
   onFilterChange: (filter: 'ALL' | 'HIGH_SEVERE' | 'LANDSLIDE' | 'FLOOD') => void;
-  /** Navigate back to the Landing Page */
   onGoHome?: () => void;
-  /** Trigger geolocation scan (same as Check My Area) */
   onScanLocation?: () => void;
-  /** Whether a location scan is currently in progress */
   isLocating?: boolean;
 }
 
@@ -125,13 +122,11 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   const userMarkerRef = useRef<L.Marker | null>(null);
   const layerMenuRef = useRef<HTMLDivElement>(null);
 
-  // Map layer toggle state
   const [baseLayer, setBaseLayer] = useState<BaseLayerType>('light');
   const [showLabels, setShowLabels] = useState<boolean>(true);
   const [showHeatmap, setShowHeatmap] = useState<boolean>(false);
   const [isLayerMenuOpen, setIsLayerMenuOpen] = useState<boolean>(false);
 
-  // Close layer menu on outside click
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (layerMenuRef.current && !layerMenuRef.current.contains(event.target as Node)) {
@@ -146,11 +141,9 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     };
   }, [isLayerMenuOpen]);
 
-  // Initialize Leaflet Map Base & Default Tile Layer
   useEffect(() => {
     if (!mapContainerRef.current) return;
 
-    // Prevent re-initializing if already active
     if (mapInstanceRef.current) return;
 
     // Clear any stale Leaflet id from container in React Strict Mode
@@ -158,18 +151,16 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       delete (mapContainerRef.current as unknown as { _leaflet_id?: number })._leaflet_id;
     }
 
-    // Default center on Assam State, India
-    const initialCenter: [number, number] = [26.2, 92.9]; // Geographic center of Assam
+    const initialCenter: [number, number] = [26.2, 92.9];
     const map = L.map(mapContainerRef.current, {
       center: initialCenter,
       zoom: 7,
-      zoomControl: false, // Custom controls rendered in UI overlay
+      zoomControl: false,
       attributionControl: true,
       minZoom: 3,
       maxZoom: 18,
     });
 
-    // Add initial base tile layer immediately so map is never blank
     const layerMeta = BASE_LAYERS[baseLayer];
     const initialBaseLayer = L.tileLayer(layerMeta.url, {
       attribution: layerMeta.attribution,
@@ -183,7 +174,6 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     mapInstanceRef.current = map;
     layerGroupRef.current = layerGroup;
 
-    // Ensure size calculation after DOM render
     const t1 = setTimeout(() => {
       map.invalidateSize();
     }, 150);
@@ -192,7 +182,6 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       map.invalidateSize();
     }, 500);
 
-    // Handle container resizing
     const resizeObserver = new ResizeObserver(() => {
       map.invalidateSize();
     });
@@ -214,20 +203,17 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     };
   }, []);
 
-  // Synchronize Base Map and Overlay Tile Layers when user switches
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map) return;
 
     const layerMeta = BASE_LAYERS[baseLayer];
 
-    // Remove previous base layer if existing
     if (baseTileLayerRef.current) {
       map.removeLayer(baseTileLayerRef.current);
       baseTileLayerRef.current = null;
     }
 
-    // Add newly selected base tile layer
     const newBaseLayer = L.tileLayer(layerMeta.url, {
       attribution: layerMeta.attribution,
       subdomains: layerMeta.subdomains || 'abc',
@@ -236,13 +222,11 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     newBaseLayer.addTo(map);
     baseTileLayerRef.current = newBaseLayer;
 
-    // Remove previous labels overlay if existing
     if (labelsTileLayerRef.current) {
       map.removeLayer(labelsTileLayerRef.current);
       labelsTileLayerRef.current = null;
     }
 
-    // Add place and river labels overlay if enabled on satellite imagery
     if (showLabels && baseLayer === 'satellite') {
       const labelsLayer = L.tileLayer(LABELS_OVERLAY_URL, {
         attribution: 'Labels &copy; Esri',
@@ -253,12 +237,10 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     }
   }, [baseLayer, showLabels]);
 
-  // Synchronize Composite Risk Heatmap Layer
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map) return;
 
-    // Remove previous heat layer if existing
     if (heatLayerRef.current) {
       try {
         map.removeLayer(heatLayerRef.current);
@@ -270,7 +252,6 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
 
     if (!showHeatmap) return;
 
-    // Filter zones to match active hazard view
     const activeZones = zones.filter((z) => {
       if (filterHazard === 'HIGH_SEVERE') {
         return z.assessment.overallLevel === 'High' || z.assessment.overallLevel === 'Severe';
@@ -284,7 +265,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       return true;
     });
 
-    // Build weighted heat sampling points: [latitude, longitude, intensity 0..1]
+    // Leaflet heat points use [latitude, longitude, intensity].
     const heatPoints: [number, number, number][] = [];
 
     activeZones.forEach((zone) => {
@@ -295,10 +276,8 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         score = zone.assessment.landslideScore;
       }
 
-      // Intensity normalized from 0.15 to 1.0 based on 0-100 score
       const intensity = Math.max(0.15, Math.min(1.0, score / 100));
 
-      // 1. Zone geographic center (peak intensity core)
       if (
         Array.isArray(zone.center) &&
         zone.center.length >= 2 &&
@@ -308,20 +287,16 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         heatPoints.push([cLat, cLng, intensity]);
         heatPoints.push([cLat, cLng, intensity * 0.95]);
 
-        // 2. Sample along watershed polygon vertices and interior interpolation points
         if (Array.isArray(zone.polygon)) {
           zone.polygon.forEach((pt) => {
             if (Array.isArray(pt) && pt.length >= 2 && isValidLatLng(pt[0], pt[1])) {
               const [pLat, pLng] = pt;
-              // Perimeter vertex
               heatPoints.push([pLat, pLng, intensity * 0.6]);
 
-              // Midpoint interpolation to fill catchment basin
               const midLat = (cLat + pLat) / 2;
               const midLng = (cLng + pLng) / 2;
               heatPoints.push([midLat, midLng, intensity * 0.8]);
 
-              // Quarter point near center
               const qLat = cLat * 0.7 + pLat * 0.3;
               const qLng = cLng * 0.7 + pLng * 0.3;
               heatPoints.push([qLat, qLng, intensity * 0.9]);
@@ -374,7 +349,6 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     };
   }, [showHeatmap, zones, filterHazard, baseLayer]);
 
-  // Update Zones & Layers
   useEffect(() => {
     const map = mapInstanceRef.current;
     const layerGroup = layerGroupRef.current;
@@ -382,7 +356,6 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
 
     layerGroup.clearLayers();
 
-    // Filter zones based on active tab
     const filteredZones = zones.filter((z) => {
       if (filterHazard === 'HIGH_SEVERE') {
         return z.assessment.overallLevel === 'High' || z.assessment.overallLevel === 'Severe';
@@ -402,7 +375,6 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       const isSelected = selectedZone?.id === zone.id;
       const palette = RISK_PALETTE[zone.assessment.overallLevel];
 
-      // Validate and Draw Watershed Polygon
       const validPolygon = Array.isArray(zone.polygon)
         ? (zone.polygon.filter(
           (pt) => Array.isArray(pt) && pt.length >= 2 && isValidLatLng(pt[0], pt[1])
@@ -436,7 +408,6 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         }
       }
 
-      // Create Custom HTML Marker Beacon if center coordinates are valid
       if (
         !Array.isArray(zone.center) ||
         zone.center.length < 2 ||
@@ -479,7 +450,6 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       try {
         const marker = L.marker(zone.center as [number, number], { icon: customIcon });
 
-        // Clean HTML Popup
         const popupHtml = `
           <div class="p-3.5 max-w-[280px] font-sans text-stone-900">
             <div class="flex items-center justify-between gap-2 mb-2">
@@ -546,7 +516,6 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     });
   }, [zones, selectedZone, filterHazard, onSelectZone, baseLayer, showHeatmap]);
 
-  // Pan to selected zone safely
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map || !selectedZone) return;
@@ -567,7 +536,6 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     }
   }, [selectedZone]);
 
-  // Handle user geolocation marker safely
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map) return;

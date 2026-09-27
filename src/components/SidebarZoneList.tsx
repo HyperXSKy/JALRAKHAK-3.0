@@ -30,7 +30,6 @@ export const SidebarZoneList: React.FC<SidebarZoneListProps> = ({
   const filteredAndSortedZones = useMemo(() => {
     return zones
       .filter((zone) => {
-        // Search text
         if (searchQuery.trim()) {
           const q = searchQuery.toLowerCase();
           const matchName = zone.name.toLowerCase().includes(q);
@@ -39,12 +38,10 @@ export const SidebarZoneList: React.FC<SidebarZoneListProps> = ({
           if (!matchName && !matchRegion && !matchCountry) return false;
         }
 
-        // Severity filter
         if (severityFilter !== 'ALL' && zone.assessment.overallLevel !== severityFilter) {
           return false;
         }
 
-        // Hazard focus
         if (hazardFocus === 'LANDSLIDE' && zone.assessment.landslideScore < 45) {
           return false;
         }
@@ -68,7 +65,6 @@ export const SidebarZoneList: React.FC<SidebarZoneListProps> = ({
       });
   }, [zones, searchQuery, severityFilter, hazardFocus, sortBy]);
 
-  // Counts for pills
   const counts = useMemo(() => {
     return {
       all: zones.length,

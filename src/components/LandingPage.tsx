@@ -18,6 +18,7 @@ import {
   Compass,
 } from 'lucide-react';
 import { ZoneWithTelemetry, EarlyWarningAlert } from '../types';
+import { SimulationScenario } from '../services/openMeteo';
 
 interface LandingPageProps {
   zones: ZoneWithTelemetry[];
@@ -30,6 +31,8 @@ interface LandingPageProps {
   onOpenAlerts: () => void;
   isLiveApi: boolean;
   lastSyncTime: string;
+  simulationScenario: SimulationScenario;
+  isLoading: boolean;
 }
 
 export const LandingPage: React.FC<LandingPageProps> = ({
@@ -43,8 +46,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   onOpenAlerts,
   isLiveApi,
   lastSyncTime,
+  simulationScenario,
+  isLoading,
 }) => {
-  // Compute summary stats from live data
   const highRiskCount = zones.filter((z) => {
     const lvl = z.assessment?.overallLevel?.toUpperCase();
     return lvl === 'HIGH' || lvl === 'SEVERE';
@@ -61,46 +65,40 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     : null;
 
   return (
-    <div id="jalrakshak-landing-page" className="min-h-full flex flex-col bg-stone-50/50">
-      {/* Hero Section */}
-      <section className="relative overflow-hidden pt-10 pb-16 px-4 sm:px-6 lg:px-8 border-b border-stone-200/80">
-        {/* Subtle decorative background gradient glows */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-96 bg-gradient-to-b from-orange-100/40 via-amber-50/20 to-transparent pointer-events-none -z-10 blur-3xl" />
-
-        <div className="max-w-5xl mx-auto text-center space-y-6">
-          {/* Live System Status Pill */}
+    <div id="jalrakshak-landing-page" className="min-h-full flex flex-col bg-[#f3f7f3]">
+      <section className="relative overflow-hidden pt-10 pb-14 px-4 sm:px-6 lg:px-8 border-b border-emerald-900/10 bg-[linear-gradient(115deg,#eef6f0_0%,#f7f7ee_58%,#f8eee8_100%)]">
+        <div className="max-w-6xl mx-auto space-y-6">
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/80 border border-stone-200/80 shadow-2xs text-xs font-semibold text-stone-700 backdrop-blur-md">
-            <span className="w-2 h-2 rounded-full bg-orange-600 animate-pulse" />
-            <span className="text-stone-900 font-bold">Assam Basin Live Telemetry</span>
-            <span className="text-stone-400">&bull;</span>
-            <span className="text-stone-600 font-medium">
-              {isLiveApi ? 'Open-Meteo Radar Connected' : 'Simulated Telemetry'}
+            <span className={`w-2 h-2 rounded-full ${simulationScenario !== 'LIVE' || isLoading ? 'bg-amber-500 animate-pulse' : isLiveApi ? 'bg-emerald-600' : 'bg-stone-400'}`} />
+            <span className="text-stone-900 font-bold">
+              {simulationScenario !== 'LIVE'
+                ? 'Demo scenario'
+                : isLoading
+                  ? 'Checking conditions'
+                  : isLiveApi
+                  ? 'Live weather data'
+                  : 'Live data unavailable'}
             </span>
-            {lastSyncTime && (
-              <span className="hidden sm:inline text-stone-400 font-mono text-[11px]">
-                ({lastSyncTime})
-              </span>
+            {simulationScenario === 'LIVE' && !isLoading && isLiveApi && lastSyncTime && (
+              <span className="text-stone-500 font-medium">Updated {lastSyncTime}</span>
             )}
           </div>
 
-          {/* Main Title */}
-          <div className="space-y-3">
-            <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-stone-950 leading-[1.15]">
-              Hyperlocal Hydrological Defense &amp;{' '}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-600 via-amber-600 to-orange-700">
-                Early Warning System
-              </span>
+          <div className="space-y-3 max-w-3xl">
+            <h1 className="text-3xl sm:text-5xl font-extrabold text-[#193c38] leading-tight">
+              A clearer picture of rain and flood risk in <span className="text-emerald-700">Assam</span>
             </h1>
-
+            <p className="max-w-2xl text-sm sm:text-base text-stone-600 leading-relaxed">
+              Local weather, area reports and practical next steps, together in one place.
+            </p>
           </div>
 
-          {/* Primary Call-to-Actions */}
           <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
             <button
               onClick={onLaunchConsole}
               className="tactile-btn flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-stone-900 via-stone-850 to-stone-900 hover:bg-stone-800 text-white rounded-xl font-bold text-sm shadow-md shadow-stone-900/20 transition cursor-pointer"
             >
-              <span>Launch Live Operations Console</span>
+              <span>View risk map</span>
               <ArrowRight className="w-4 h-4 text-orange-400" />
             </button>
 
@@ -109,7 +107,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               className="tactile-btn flex items-center gap-2 px-5 py-3 glass-card hover:bg-white text-stone-800 rounded-xl font-bold text-sm shadow-2xs border border-stone-200/80 transition cursor-pointer"
             >
               <MapPin className="w-4 h-4 text-orange-600" />
-              <span>Scan My Location</span>
+              <span>Check my area</span>
             </button>
 
             <button
@@ -117,76 +115,80 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               className="tactile-btn flex items-center gap-1.5 px-4 py-3 glass-card hover:bg-white text-stone-700 rounded-xl font-semibold text-xs shadow-2xs border border-stone-200/80 transition cursor-pointer"
             >
               <Calculator className="w-4 h-4 text-stone-500" />
-              <span>Risk Equations</span>
+              <span>How risk is calculated</span>
             </button>
           </div>
 
-          {/* Key Live Telemetry Metrics Bento */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-6 max-w-4xl mx-auto text-left">
             <div className="glass-card p-4 rounded-2xl border border-stone-200/80 shadow-2xs">
               <div className="flex items-center justify-between text-stone-500 mb-1">
-                <span className="text-[11px] font-bold uppercase tracking-wider">Monitored Zones</span>
+                <span className="text-[11px] font-bold uppercase tracking-wider">Areas monitored</span>
                 <Compass className="w-3.5 h-3.5 text-stone-400" />
               </div>
               <div className="text-2xl font-black text-stone-900 font-mono">
-                {zones.length || 8}
+                {zones.length || '—'}
               </div>
-              <p className="text-[11px] text-stone-500 mt-0.5">High-vulnerability sectors</p>
+              <p className="text-[11px] text-stone-500 mt-0.5">Across Assam</p>
             </div>
 
             <div className="glass-card p-4 rounded-2xl border border-stone-200/80 shadow-2xs">
               <div className="flex items-center justify-between text-stone-500 mb-1">
-                <span className="text-[11px] font-bold uppercase tracking-wider">Active Alerts</span>
+                <span className="text-[11px] font-bold uppercase tracking-wider">Areas on alert</span>
                 <Flame className="w-3.5 h-3.5 text-orange-600" />
               </div>
               <div className="text-2xl font-black text-orange-600 font-mono">
-                {alerts.length}
+                {zones.length ? alerts.length : '—'}
               </div>
               <p className="text-[11px] text-stone-500 mt-0.5">
-                {highRiskCount} in High / Severe tier
+                {zones.length
+                  ? `${highRiskCount} areas at high or severe risk`
+                  : isLoading
+                    ? 'Waiting for area reports'
+                    : 'Area reports unavailable'}
               </p>
             </div>
 
             <div className="glass-card p-4 rounded-2xl border border-stone-200/80 shadow-2xs">
               <div className="flex items-center justify-between text-stone-500 mb-1">
-                <span className="text-[11px] font-bold uppercase tracking-wider">Peak Rainfall Rate</span>
+                <span className="text-[11px] font-bold uppercase tracking-wider">Highest rain rate</span>
                 <CloudRain className="w-3.5 h-3.5 text-amber-600" />
               </div>
               <div className="text-2xl font-black text-stone-900 font-mono">
-                {maxRainfall.toFixed(1)} <span className="text-xs font-bold text-stone-500">mm/h</span>
+                {zones.length ? <>{maxRainfall.toFixed(1)} <span className="text-xs font-bold text-stone-500">mm/h</span></> : '—'}
               </div>
-              <p className="text-[11px] text-stone-500 mt-0.5">Live atmospheric ingestion</p>
+              <p className="text-[11px] text-stone-500 mt-0.5">
+                {zones.length ? 'Across monitored areas' : isLoading ? 'Waiting for readings' : 'No current readings'}
+              </p>
             </div>
 
             <div className="glass-card p-4 rounded-2xl border border-stone-200/80 shadow-2xs">
               <div className="flex items-center justify-between text-stone-500 mb-1">
-                <span className="text-[11px] font-bold uppercase tracking-wider">Primary Hazard Sector</span>
+                <span className="text-[11px] font-bold uppercase tracking-wider">Area to watch</span>
                 <Activity className="w-3.5 h-3.5 text-orange-600" />
               </div>
               <div className="text-sm font-bold text-stone-900 truncate">
-                {highestRiskZone ? highestRiskZone.name : 'Guwahati Urban'}
+                {highestRiskZone ? highestRiskZone.name : isLoading ? 'Checking areas…' : 'No data available'}
               </div>
               <p className="text-[11px] text-orange-700 font-semibold mt-0.5">
-                {highestRiskZone ? `${highestRiskZone.assessment.compositeScore}/100 Risk Score` : 'Nominal'}
+                {highestRiskZone ? `${highestRiskZone.assessment.overallLevel} risk` : isLoading ? 'Waiting for readings' : 'No current reading'}
               </p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Live Sector Pulse / Interactive Snapshot */}
       <section className="py-12 px-4 sm:px-6 lg:px-8 max-w-6xl mx-auto w-full space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
           <div>
-            <div className="flex items-center gap-2 text-xs font-bold text-orange-700 uppercase tracking-wider">
+            <div className="flex items-center gap-2 text-xs font-bold text-emerald-800 uppercase tracking-wider">
               <Layers className="w-4 h-4" />
-              <span>Real-Time Regional Monitoring</span>
+              <span>Current conditions</span>
             </div>
-            <h2 className="text-2xl font-black text-stone-950 mt-1">
-              Active Watershed Observation Grid
+            <h2 className="text-2xl font-black text-[#193c38] mt-1">
+              Conditions around Assam
             </h2>
             <p className="text-xs text-stone-600 mt-0.5">
-              Click any sector to focus radar telemetry, elevation profiles, and 24-hour rainfall curves in the Operations Console.
+              Choose an area for its latest rainfall and risk details.
             </p>
           </div>
 
@@ -194,14 +196,18 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             onClick={onLaunchConsole}
             className="tactile-btn self-start sm:self-auto flex items-center gap-1.5 px-4 py-2 glass-pill text-xs font-bold text-stone-900 hover:text-orange-700 transition cursor-pointer"
           >
-            <span>Open Interactive GIS Map</span>
+            <span>View map</span>
             <ChevronRight className="w-3.5 h-3.5 text-orange-600" />
           </button>
         </div>
 
         {/* Zones Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-          {zones.slice(0, 8).map((zone) => {
+          {zones.length === 0 ? (
+            <div className="col-span-full border border-stone-200 rounded-xl bg-white/70 p-5 text-sm text-stone-700">
+              {isLoading ? 'Checking current conditions for monitored areas…' : 'Area readings are unavailable right now.'}
+            </div>
+          ) : zones.slice(0, 8).map((zone) => {
             const lvl = zone.assessment?.overallLevel?.toUpperCase();
             const isHigh = lvl === 'HIGH' || lvl === 'SEVERE';
 
@@ -232,30 +238,30 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
                   <div className="mt-3 space-y-1.5 text-xs">
                     <div className="flex items-center justify-between text-stone-600">
-                      <span>Composite Risk</span>
+                      <span>Risk score</span>
                       <span className="font-mono font-bold text-stone-900">
                         {zone.assessment?.compositeScore ?? 0}/100
                       </span>
                     </div>
 
                     <div className="flex items-center justify-between text-stone-600">
-                      <span>Precipitation Rate</span>
+                      <span>Rain now</span>
                       <span className="font-mono font-bold text-stone-900">
                         {(zone.weather?.currentRateMmPerHour ?? 0).toFixed(1)} mm/h
                       </span>
                     </div>
 
                     <div className="flex items-center justify-between text-stone-600">
-                      <span>Terrain Slope</span>
+                      <span>Rain in 24 hours</span>
                       <span className="font-mono font-bold text-stone-900">
-                        {zone.slope ?? 0}°
+                        {(zone.weather?.last24hMm ?? 0).toFixed(1)} mm
                       </span>
                     </div>
                   </div>
                 </div>
 
                 <div className="pt-3 mt-3 border-t border-stone-100 flex items-center justify-between text-[11px] text-stone-500 group-hover:text-orange-600 font-semibold">
-                  <span>Inspect Radar &amp; Telemetry</span>
+                  <span>View area</span>
                   <ArrowRight className="w-3.5 h-3.5 transform group-hover:translate-x-1 transition" />
                 </div>
               </div>
@@ -267,15 +273,15 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       {/* Core Architectural Pillars */}
       <section className="py-12 px-4 sm:px-6 lg:px-8 border-y border-stone-200/80 bg-white/60 backdrop-blur-md">
         <div className="max-w-6xl mx-auto space-y-8">
-          <div className="text-center max-w-2xl mx-auto space-y-2">
-            <span className="text-xs font-bold text-orange-700 uppercase tracking-wider">
-              Engineering Architecture
+          <div className="max-w-2xl space-y-2">
+            <span className="text-xs font-bold text-emerald-800 uppercase tracking-wider">
+              How we assess conditions
             </span>
-            <h2 className="text-2xl sm:text-3xl font-black text-stone-950">
-              Coupling Atmospheric Feeds with Geomorphology
+            <h2 className="text-2xl sm:text-3xl font-black text-[#193c38]">
+              Rain, rivers and the shape of the land
             </h2>
             <p className="text-xs sm:text-sm text-stone-600 leading-relaxed font-medium">
-              JALRAKSHAK does not rely on subjective estimates. It computes physical hazard thresholds via two interconnected scientific indices.
+              We bring together weather and terrain signals to help show where conditions may need attention.
             </p>
           </div>
 
@@ -293,7 +299,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               </p>
               <div className="pt-2">
                 <span className="inline-block px-2.5 py-1 rounded-lg bg-stone-100 text-[10px] font-mono text-stone-700 font-bold border border-stone-200">
-                  LSI = (3.2 &times; I + 0.42 &times; A72) &times; M_slope
+                  LSI = [(3.2 &times; I + 0.42 &times; A72) &times; M_slope &times; M_sat] &times; 0.45
                 </span>
               </div>
             </div>
@@ -304,14 +310,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 <Waves className="w-5 h-5" />
               </div>
               <h3 className="text-base font-bold text-stone-900">
-                Flash Flood Velocity Modeling (FFI)
+                Flash Flood Risk Index (FFI)
               </h3>
               <p className="text-xs text-stone-600 leading-relaxed">
-                Evaluates alluvial floodplain buffers, river distance proximity, and low-elevation valley convergence dynamics driven by 24-hour cloudburst runoff volume.
+                Combines 24-hour rainfall, current rain intensity, river distance, and elevation.
               </p>
               <div className="pt-2">
                 <span className="inline-block px-2.5 py-1 rounded-lg bg-stone-100 text-[10px] font-mono text-stone-700 font-bold border border-stone-200">
-                  FFI = (0.68 &times; A24 + 3.6 &times; I) &times; R_river
+                  FFI = [(0.68 &times; A24 + 3.6 &times; I) &times; R_river &times; E_elevation] &times; 0.40
                 </span>
               </div>
             </div>
@@ -325,7 +331,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 Cell Broadcast &amp; SMS Dissemination
               </h3>
               <p className="text-xs text-stone-600 leading-relaxed">
-                Direct integration with cellular warning gateways. When composite scores cross alert thresholds, automated warning packets are formatted for localized broadcast without app dependency.
+                Warning packets are formatted for review in the simulator. Cellular gateway delivery is not connected in this prototype.
               </p>
               <div className="pt-2">
                 <button
@@ -346,13 +352,13 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         <div className="glass-card p-6 sm:p-8 rounded-3xl border border-stone-200/80 shadow-md bg-gradient-to-br from-white/90 via-orange-50/30 to-amber-50/20 flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="space-y-2 text-center md:text-left max-w-lg">
             <span className="text-xs font-bold text-orange-700 uppercase tracking-wider">
-              Citizen Geolocation Scan
+              Check your area
             </span>
             <h3 className="text-xl sm:text-2xl font-black text-stone-950">
-              Are you currently located in an Assam risk zone?
+              Is it raining near you?
             </h3>
             <p className="text-xs text-stone-600 leading-relaxed font-medium">
-              Use your device&apos;s GPS to pinpoint the nearest watershed basin, inspect current rainfall at your exact coordinates, and receive tailored evacuation guidance.
+              Share your location to check local rainfall and the nearest monitored area. Follow instructions from local authorities during an emergency.
             </p>
           </div>
 
@@ -362,14 +368,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               className="tactile-btn flex items-center justify-center gap-2 px-5 py-3 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-xl font-bold text-xs shadow-md shadow-orange-500/20 cursor-pointer"
             >
               <MapPin className="w-4 h-4" />
-              <span>Scan My Current Coordinates</span>
+              <span>Use my location</span>
             </button>
 
             <button
               onClick={onLaunchConsole}
               className="tactile-btn flex items-center justify-center gap-2 px-5 py-3 glass-card hover:bg-white text-stone-800 rounded-xl font-bold text-xs border border-stone-200/80 cursor-pointer"
             >
-              <span>Explore All Sectors</span>
+              <span>Browse areas</span>
               <ArrowRight className="w-4 h-4 text-stone-500" />
             </button>
           </div>
@@ -392,13 +398,13 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
           <div className="flex items-center gap-4 text-[11px] font-semibold text-stone-600">
             <button onClick={onOpenHowItWorks} className="hover:text-stone-900 cursor-pointer">
-              Model Specs
+              How risk is calculated
             </button>
             <button onClick={onOpenSmsSimulator} className="hover:text-stone-900 cursor-pointer">
-              Cell Simulator
+              SMS demo
             </button>
             <button onClick={onLaunchConsole} className="hover:text-orange-700 cursor-pointer">
-              GIS Radar
+              Risk map
             </button>
           </div>
         </div>
