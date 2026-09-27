@@ -835,7 +835,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                       <div className="mt-0.5 shrink-0">
                         {layerKey === 'light' && <MapIcon className="w-4 h-4 text-stone-600" />}
                         {layerKey === 'terrain' && <Mountain className="w-4 h-4 text-amber-600" />}
-                        {layerKey === 'satellite' && <Globe className="w-4 h-4 text-emerald-600" />}
+                        {layerKey === 'satellite' && <Globe className="w-4 h-4 text-sky-600" />}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-2">
@@ -973,7 +973,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           onClick={() => setIsFullMap((current) => !current)}
           title={isFullMap ? 'Exit full map view' : 'Open full map view'}
           aria-label={isFullMap ? 'Exit full map view' : 'Open full map view'}
-          className="h-9 w-9 rounded-full border border-white/70 glass-card flex items-center justify-center text-stone-700 shadow-md transition hover:bg-white hover:text-emerald-800 cursor-pointer"
+          className="h-9 w-9 rounded-full border border-white/70 glass-card flex items-center justify-center text-stone-700 shadow-md transition hover:bg-white hover:text-blue-800 cursor-pointer"
         >
           {isFullMap ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
         </button>

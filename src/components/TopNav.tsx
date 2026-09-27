@@ -37,7 +37,7 @@ export const TopNav: React.FC<TopNavProps> = ({
             <div className="flex items-center gap-2">
               <button
                 onClick={() => onViewChange && onViewChange('LANDING')}
-                className="text-base font-bold text-[#193c38] leading-none hover:text-emerald-700 transition cursor-pointer text-left"
+                className="text-base font-bold text-[#193653] leading-none hover:text-blue-700 transition cursor-pointer text-left"
               >
                 JALRAKSHAK
               </button>

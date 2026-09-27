@@ -65,8 +65,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     : null;
 
   return (
-    <div id="jalrakshak-landing-page" className="min-h-full flex flex-col bg-[#f3f7f3]">
-      <section className="relative overflow-hidden pt-10 pb-14 px-4 sm:px-6 lg:px-8 border-b border-emerald-900/10 bg-[linear-gradient(115deg,#eef6f0_0%,#f7f7ee_58%,#f8eee8_100%)]">
+    <div id="jalrakshak-landing-page" className="min-h-full flex flex-col bg-[#f2f6fb]">
+      <section className="relative overflow-hidden pt-10 pb-14 px-4 sm:px-6 lg:px-8 border-b border-blue-900/10 bg-[linear-gradient(115deg,#edf5fc_0%,#f5f7fb_58%,#eaf2fa_100%)]">
         <div className="max-w-6xl mx-auto space-y-6">
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/80 border border-stone-200/80 shadow-2xs text-xs font-semibold text-stone-700 backdrop-blur-md">
             <span className={`w-2 h-2 rounded-full ${simulationScenario !== 'LIVE' || isLoading ? 'bg-amber-500 animate-pulse' : isLiveApi ? 'bg-emerald-600' : 'bg-stone-400'}`} />
@@ -85,8 +85,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           </div>
 
           <div className="space-y-3 max-w-3xl">
-            <h1 className="text-3xl sm:text-5xl font-extrabold text-[#193c38] leading-tight">
-              A clearer picture of rain and flood risk in <span className="text-emerald-700">Assam</span>
+            <h1 className="text-3xl sm:text-5xl font-extrabold text-[#193653] leading-tight">
+              A clearer picture of rain and flood risk in <span className="text-blue-700">Assam</span>
             </h1>
             <p className="max-w-2xl text-sm sm:text-base text-stone-600 leading-relaxed">
               Local weather, area reports and practical next steps, together in one place.
@@ -180,11 +180,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       <section className="py-12 px-4 sm:px-6 lg:px-8 max-w-6xl mx-auto w-full space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
           <div>
-            <div className="flex items-center gap-2 text-xs font-bold text-emerald-800 uppercase tracking-wider">
+            <div className="flex items-center gap-2 text-xs font-bold text-blue-800 uppercase tracking-wider">
               <Layers className="w-4 h-4" />
               <span>Current conditions</span>
             </div>
-            <h2 className="text-2xl font-black text-[#193c38] mt-1">
+            <h2 className="text-2xl font-black text-[#193653] mt-1">
               Conditions around Assam
             </h2>
             <p className="text-xs text-stone-600 mt-0.5">
@@ -274,10 +274,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       <section className="py-12 px-4 sm:px-6 lg:px-8 border-y border-stone-200/80 bg-white/60 backdrop-blur-md">
         <div className="max-w-6xl mx-auto space-y-8">
           <div className="max-w-2xl space-y-2">
-            <span className="text-xs font-bold text-emerald-800 uppercase tracking-wider">
+            <span className="text-xs font-bold text-blue-800 uppercase tracking-wider">
               How we assess conditions
             </span>
-            <h2 className="text-2xl sm:text-3xl font-black text-[#193c38]">
+            <h2 className="text-2xl sm:text-3xl font-black text-[#193653]">
               Rain, rivers and the shape of the land
             </h2>
             <p className="text-xs sm:text-sm text-stone-600 leading-relaxed font-medium">
