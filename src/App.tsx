@@ -53,15 +53,12 @@ export default function App() {
   const [countdownSeconds, setCountdownSeconds] = useState<number>(60);
   const [isAutoRefreshActive, setIsAutoRefreshActive] = useState<boolean>(true);
 
-  // Map Filter
   const [filterHazard, setFilterHazard] = useState<'ALL' | 'HIGH_SEVERE' | 'LANDSLIDE' | 'FLOOD'>('ALL');
 
-  // Modals & Drawers
   const [isHowItWorksOpen, setIsHowItWorksOpen] = useState(false);
   const [isSmsOpen, setIsSmsOpen] = useState(false);
   const [isAlertsDrawerOpen, setIsAlertsDrawerOpen] = useState(false);
 
-  // Geolocation "Check My Area" & Exact Real-Time Weather
   const [isCheckAreaOpen, setIsCheckAreaOpen] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
   const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
@@ -71,10 +68,8 @@ export default function App() {
   const [distanceToNearestKm, setDistanceToNearestKm] = useState<number | null>(null);
   const [geoError, setGeoError] = useState<string | null>(null);
 
-  // Mobile View Switcher (for small screens)
   const [mobileTab, setMobileTab] = useState<'MAP' | 'LIST' | 'DETAIL'>('MAP');
 
-  // Load telemetry data for all zones
   const loadData = useCallback(async (scenarioMode: SimulationScenario = 'LIVE') => {
     setIsRefreshing(true);
     try {
@@ -92,7 +87,7 @@ export default function App() {
       setIsRefreshing(false);
       return;
     } catch (backendError) {
-      console.warn('Hydromet backend unavailable; using browser fallback:', backendError);
+      console.warn('JALRAKSHAK backend unavailable; using browser fallback:', backendError);
     }
 
     try {
@@ -108,18 +103,15 @@ export default function App() {
         })
       );
 
-      // Check if at least one returned true live API
       const hasLive = results.some((r) => r.weather.isLive);
       setIsLiveApi(scenarioMode === 'LIVE' && hasLive);
 
-      // Generate active warning alerts
       const generatedAlerts: EarlyWarningAlert[] = [];
       results.forEach((z) => {
         const alert = generateZoneAlert(z, z.assessment);
         if (alert) generatedAlerts.push(alert);
       });
 
-      // Sort zones by composite risk
       results.sort((a, b) => b.assessment.compositeScore - a.assessment.compositeScore);
 
       setZones(results);
@@ -127,7 +119,6 @@ export default function App() {
       setLastSyncTime(new Date().toLocaleTimeString());
       setCountdownSeconds(60);
 
-      // Update selected zone if already chosen, or pick highest risk
       setSelectedZone((prev) => {
         if (!prev) return results[0] || null;
         const matching = results.find((r) => r.id === prev.id);
@@ -145,7 +136,6 @@ export default function App() {
     loadData(scenario);
   }, [loadData, scenario]);
 
-  // Real-time automatic polling timer (every 60s for live data)
   useEffect(() => {
     if (scenario !== 'LIVE' || !isAutoRefreshActive) return;
 
@@ -162,12 +152,10 @@ export default function App() {
     return () => clearInterval(timer);
   }, [scenario, isAutoRefreshActive, loadData]);
 
-  // Handle Scenario Change
   const handleScenarioChange = (newScenario: SimulationScenario) => {
     setScenario(newScenario);
   };
 
-  // Handle Geolocation "Check My Area"
   const handleCheckMyArea = () => {
     setGeoError(null);
     setIsLocating(true);
@@ -212,7 +200,6 @@ export default function App() {
 
         setUserCoords({ lat, lng });
 
-        // Find nearest zone
         let minDistance = Infinity;
         let closest: ZoneWithTelemetry | null = null;
 
@@ -232,14 +219,12 @@ export default function App() {
         setIsLocating(false);
         setIsCheckAreaOpen(true);
 
-        // Fetch real-time weather at user's exact detected GPS coordinates
         setIsLoadingUserWeather(true);
         fetchLivePointWeather(lat, lng, 'User Location')
           .then((weather) => setUserWeather(weather))
           .catch((err) => console.warn('Could not fetch user exact live weather:', err))
           .finally(() => setIsLoadingUserWeather(false));
 
-        // Auto select on map
         if (activeNearest) {
           setSelectedZone(activeNearest);
         }

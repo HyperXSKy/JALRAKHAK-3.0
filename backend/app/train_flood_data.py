@@ -55,9 +55,7 @@ def build_flood_dataset(start: str, end: str) -> tuple[np.ndarray, np.ndarray, l
                 float(zone.get("imperviousFraction", 0.3)),
                 float(zone["catchmentAreaKm2"]),
             ])
-            # Proxy event: unusually wet next 24h combined with local exposure.
-            # This is deliberately broad enough for a usable training balance;
-            # replace it with observed flood labels when those become available.
+            # This is a rainfall-risk proxy, not an observed flood label.
             threshold = max(25.0, 65.0 - zone["riverProximityKm"] * 15.0)
             labels.append(int(forecast24 >= threshold))
             timestamps.append(times[index])

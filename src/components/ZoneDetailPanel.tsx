@@ -51,7 +51,6 @@ export const ZoneDetailPanel: React.FC<ZoneDetailPanelProps> = ({
   const isHighOrSevere =
     zone.assessment.overallLevel === 'High' || zone.assessment.overallLevel === 'Severe';
 
-  // Format Recharts data
   const dailyData = zone.weather.dailyHistory.map((item) => ({
     name: item.date,
     rainfall: item.rainfallMm,

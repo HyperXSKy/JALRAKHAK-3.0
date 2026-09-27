@@ -58,6 +58,7 @@ def parse_open_meteo(data: dict, label: str) -> dict[str, Any]:
 
     last24 = _sum_slice(precip, current_index - 24, current_index)
     last72 = _sum_slice(precip, current_index - 72, current_index)
+    last168 = _sum_slice(precip, current_index - 168, current_index)
     next24 = _sum_slice(precip, current_index, current_index + 24)
     next3 = _sum_slice(precip, current_index, current_index + 3)
     next6 = _sum_slice(precip, current_index, current_index + 6)
@@ -102,11 +103,22 @@ def parse_open_meteo(data: dict, label: str) -> dict[str, Any]:
         humidity = humidities[current_index]
     if wind is None and current_index < len(winds):
         wind = winds[current_index]
+    recent_humidity = [
+        float(value)
+        for value in humidities[max(0, current_index - 24) : current_index]
+        if value is not None
+    ]
     return {
         "label": label,
         "currentRateMmPerHour": current_precip,
         "last24hMm": last24,
         "last72hMm": last72,
+        "last168hMm": last168,
+        "humidity24hPercent": (
+            round(sum(recent_humidity) / len(recent_humidity), 1)
+            if recent_humidity
+            else humidity
+        ),
         "forecastNext24hMm": next24,
         "forecastNext3hMm": next3,
         "forecastNext6hMm": next6,

@@ -48,7 +48,7 @@ def flood_features(zone: dict, weather: dict) -> np.ndarray:
 
 class FloodRiskXGBoost:
     def __init__(self) -> None:
-        self.model: xgb.XGBClassifier | None = None
+        self.model: xgb.Booster | None = None
         self.metadata: dict[str, Any] = {}
 
     def load(self) -> None:
@@ -57,15 +57,17 @@ class FloodRiskXGBoost:
                 f"Flood model is missing at {FLOOD_MODEL_PATH}. "
                 "Run: python backend/train_flood_xgboost.py"
             )
-        self.model = xgb.XGBClassifier()
-        self.model.load_model(FLOOD_MODEL_PATH)
+        model = xgb.Booster()
+        model.load_model(FLOOD_MODEL_PATH)
+        self.model = model
         if FLOOD_METADATA_PATH.exists():
             self.metadata = json.loads(FLOOD_METADATA_PATH.read_text(encoding="utf-8"))
 
     def predict(self, zone: dict, weather: dict) -> dict[str, Any]:
         if self.model is None:
             self.load()
-        probability = float(self.model.predict_proba(flood_features(zone, weather))[0, 1])
+        features = xgb.DMatrix(flood_features(zone, weather))
+        probability = float(self.model.predict(features)[0])
         holdout = self.metadata.get("chronologicalHoldout", {})
         decision_threshold = float(holdout.get("decisionThreshold", 0.35))
         moderate_threshold = decision_threshold * 0.6

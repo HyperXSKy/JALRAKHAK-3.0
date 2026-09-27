@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import time
 from typing import Any, Literal
 
@@ -8,6 +9,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.fusion import fuse_zone
+from app.hls_inundation_model import HLS_INUNDATION_MODEL, METADATA_PATH as HLS_METADATA_PATH
 from app.open_meteo import fetch_model_forecast
 from app.risk import calculate_zone_risk, generate_alert
 from app.zone_catalog import ZONES, get_zone
@@ -15,7 +17,7 @@ from app.zone_catalog import ZONES, get_zone
 Scenario = Literal["LIVE", "CLOUDBURST", "MONSOON_SURGE", "DRY_BASELINE"]
 
 app = FastAPI(
-    title="JALRAKSHAK Hydromet API",
+    title="JALRAKSHAK API",
     version="3.0.0",
     description="Integrated heavy-rainfall early warning and inundation risk service for SIH26071.",
 )
@@ -91,7 +93,7 @@ async def get_dashboard(scenario: Scenario) -> dict[str, Any]:
 
 @app.get("/api/health")
 async def health() -> dict[str, str]:
-    return {"status": "ok", "service": "jalrakshak-hydromet"}
+    return {"status": "ok", "service": "JALRAKSHAK"}
 
 
 @app.get("/api/zones")
@@ -101,7 +103,7 @@ async def zones() -> dict[str, Any]:
 
 @app.get("/api/dashboard")
 async def dashboard(
-    scenario: Scenario = Query("LIVE", description="Live or judge-demo hydromet scenario"),
+    scenario: Scenario = Query("LIVE", description="Live or judge-demo scenario"),
 ) -> dict[str, Any]:
     return await get_dashboard(scenario)
 
@@ -127,3 +129,40 @@ async def point_weather(lat: float, lng: float) -> dict[str, Any]:
     if not (-90 <= lat <= 90 and -180 <= lng <= 180):
         raise HTTPException(status_code=422, detail="Coordinates are outside valid bounds")
     return await fetch_model_forecast(lat, lng)
+
+
+@app.get("/api/models/hls-inundation")
+async def hls_model_metadata() -> dict[str, Any]:
+    if not HLS_METADATA_PATH.exists():
+        raise HTTPException(status_code=503, detail="Train the HLS model before using this endpoint")
+    return json.loads(HLS_METADATA_PATH.read_text(encoding="utf-8"))
+
+
+@app.get("/api/inundation/hls-screen")
+async def hls_inundation_screen(lat: float, lng: float) -> dict[str, Any]:
+    if not (-90 <= lat <= 90 and -180 <= lng <= 180):
+        raise HTTPException(status_code=422, detail="Coordinates are outside valid bounds")
+    try:
+        HLS_INUNDATION_MODEL.load()
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+    try:
+        HLS_INUNDATION_MODEL.nearest_cell(lat, lng)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    try:
+        weather = await fetch_model_forecast(lat, lng)
+        screening = HLS_INUNDATION_MODEL.predict(lat, lng, weather)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    return {
+        **screening,
+        "location": {"latitude": lat, "longitude": lng},
+        "weatherInputs": {
+            "last24hMm": weather["last24hMm"],
+            "last72hMm": weather["last72hMm"],
+            "last168hMm": weather.get("last168hMm"),
+            "humidity24hPercent": weather.get("humidity24hPercent"),
+            "source": "Open-Meteo point forecast / interpolated observations",
+        },
+    }

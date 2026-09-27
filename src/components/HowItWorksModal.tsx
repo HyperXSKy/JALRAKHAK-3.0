@@ -8,7 +8,6 @@ interface HowItWorksModalProps {
 }
 
 export const HowItWorksModal: React.FC<HowItWorksModalProps> = ({ isOpen, onClose }) => {
-  // Interactive sandbox state for judges
   const [testRainRate, setTestRainRate] = useState<number>(12); // mm/h
   const [test24hRain, setTest24hRain] = useState<number>(65); // mm
   const [testSlope, setTestSlope] = useState<number>(32); // degrees
@@ -17,7 +16,6 @@ export const HowItWorksModal: React.FC<HowItWorksModalProps> = ({ isOpen, onClos
 
   if (!isOpen) return null;
 
-  // Real-time calculation inside sandbox
   const slopeMultiplier = Number((Math.pow(Math.max(5, testSlope) / 26, 1.65)).toFixed(2));
   const satFactor = Number((1.0 + (testSaturation / 100) * 0.55).toFixed(2));
   const intensityLsi = testRainRate * 3.2;

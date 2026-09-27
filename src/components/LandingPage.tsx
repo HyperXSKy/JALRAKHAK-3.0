@@ -44,7 +44,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   isLiveApi,
   lastSyncTime,
 }) => {
-  // Compute summary stats from live data
   const highRiskCount = zones.filter((z) => {
     const lvl = z.assessment?.overallLevel?.toUpperCase();
     return lvl === 'HIGH' || lvl === 'SEVERE';

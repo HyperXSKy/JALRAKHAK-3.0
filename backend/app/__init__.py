@@ -1,1 +1,1 @@
-"""JALRAKSHAK hydromet backend for SIH26071."""
+"""JALRAKSHAK backend for SIH26071."""

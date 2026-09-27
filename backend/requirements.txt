@@ -5,4 +5,5 @@ numpy==2.3.3
 pydantic==2.12.4
 python-multipart==0.0.20
 xgboost==3.0.2
+Pillow>=11.0.0
 scikit-learn==1.7.2

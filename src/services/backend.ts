@@ -30,7 +30,7 @@ export async function fetchBackendDashboard(
       { signal: controller.signal }
     );
     if (!response.ok) {
-      throw new Error(`Hydromet backend HTTP ${response.status}`);
+      throw new Error(`JALRAKSHAK backend HTTP ${response.status}`);
     }
     return response.json() as Promise<BackendDashboardResponse>;
   } finally {
