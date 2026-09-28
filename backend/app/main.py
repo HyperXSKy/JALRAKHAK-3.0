@@ -50,6 +50,11 @@ TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN", "").strip()
 TWILIO_FROM_NUMBER = os.getenv("TWILIO_FROM_NUMBER", "").strip()
 ALERT_SMS_TO = os.getenv("ALERT_SMS_TO", "").strip()
 DATA_INGEST_TOKEN = os.getenv("DATA_INGEST_TOKEN", "")
+CORS_ALLOWED_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv("CORS_ALLOWED_ORIGINS", "").split(",")
+    if origin.strip()
+]
 logger = logging.getLogger(__name__)
 
 
@@ -87,6 +92,7 @@ app = FastAPI(
 )
 app.add_middleware(
     CORSMiddleware,
+    allow_origins=CORS_ALLOWED_ORIGINS,
     allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?$",
     allow_credentials=False,
     allow_methods=["GET", "POST"],
