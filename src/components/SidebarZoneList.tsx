@@ -248,21 +248,18 @@ export const SidebarZoneList: React.FC<SidebarZoneListProps> = ({
                 </div>
 
                 {/* Key Telemetry Metrics */}
-                <div className="grid grid-cols-2 gap-1.5 mt-2 pt-2 border-t border-stone-200/60 text-[11px]">
-                  <div className="flex items-center gap-1.5 text-stone-700">
-                    <span className="w-1.5 h-1.5 rounded-full bg-orange-600 animate-pulse shrink-0" />
-                    <CloudRain className="w-3.5 h-3.5 text-orange-600 shrink-0" />
-                    <span className="font-mono font-bold text-stone-900">
-                      {zone.weather.currentRateMmPerHour.toFixed(1)} mm/h
-                    </span>
+                <div className="mt-2 grid grid-cols-3 gap-1 border-t border-stone-200/60 pt-2 text-[9px]">
+                  <div className="min-w-0">
+                    <span className="flex items-center gap-1 text-stone-500"><CloudRain className="h-3 w-3 text-sky-700" />Now</span>
+                    <strong className="mt-0.5 block truncate font-mono text-[10px] text-stone-900">{zone.weather.currentRateMmPerHour.toFixed(1)} mm/h</strong>
                   </div>
-                  <div className="text-right text-stone-600 font-mono text-[10px] flex items-center justify-end gap-1.5">
-                    {zone.weather.temperatureC != null && (
-                      <span className="text-stone-600 font-medium">{zone.weather.temperatureC}°C</span>
-                    )}
-                    <span>
-                      24h: <span className="font-bold text-stone-900">{zone.weather.last24hMm.toFixed(0)}mm</span>
-                    </span>
+                  <div className="min-w-0">
+                    <span className="block text-stone-500">Past 24h</span>
+                    <strong className="mt-0.5 block truncate font-mono text-[10px] text-stone-900">{zone.weather.last24hMm.toFixed(1)} mm</strong>
+                  </div>
+                  <div className="min-w-0">
+                    <span className="block text-stone-500">Next 24h</span>
+                    <strong className="mt-0.5 block truncate font-mono text-[10px] text-stone-900">{zone.weather.forecastNext24hMm.toFixed(1)} mm</strong>
                   </div>
                 </div>
 

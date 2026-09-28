@@ -253,9 +253,16 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                     </div>
 
                     <div className="flex items-center justify-between text-stone-600">
-                      <span>Rain in 24 hours</span>
+                      <span>Past 24h</span>
                       <span className="font-mono font-bold text-stone-900">
                         {(zone.weather?.last24hMm ?? 0).toFixed(1)} mm
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between text-stone-600">
+                      <span>Next 24h forecast</span>
+                      <span className="font-mono font-bold text-stone-900">
+                        {(zone.weather?.forecastNext24hMm ?? 0).toFixed(1)} mm
                       </span>
                     </div>
                   </div>

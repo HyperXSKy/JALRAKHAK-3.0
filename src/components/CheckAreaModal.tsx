@@ -124,17 +124,23 @@ export const CheckAreaModal: React.FC<CheckAreaModalProps> = ({
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-4 gap-2 text-center">
+                    <div className="grid grid-cols-2 gap-2 text-center sm:grid-cols-5">
                       <div className="p-2 bg-white/80 rounded-lg border border-stone-200/70 shadow-2xs">
-                        <span className="text-[9px] uppercase font-bold text-stone-500 block">Rain Rate</span>
+                        <span className="text-[9px] uppercase font-bold text-stone-500 block">Now</span>
                         <span className="font-mono font-bold text-stone-900 text-xs">
                           {userWeather.currentRateMmPerHour} mm/h
                         </span>
                       </div>
                       <div className="p-2 bg-white/80 rounded-lg border border-stone-200/70 shadow-2xs">
-                        <span className="text-[9px] uppercase font-bold text-stone-500 block">24h Total</span>
+                        <span className="text-[9px] uppercase font-bold text-stone-500 block">Past 24h</span>
                         <span className="font-mono font-bold text-stone-900 text-xs">
                           {userWeather.last24hMm} mm
+                        </span>
+                      </div>
+                      <div className="p-2 bg-white/80 rounded-lg border border-stone-200/70 shadow-2xs">
+                        <span className="text-[9px] uppercase font-bold text-stone-500 block">Next 24h</span>
+                        <span className="font-mono font-bold text-stone-900 text-xs">
+                          {userWeather.forecastNext24hMm} mm
                         </span>
                       </div>
                       <div className="p-2 bg-white/80 rounded-lg border border-stone-200/70 shadow-2xs">

@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { CloudRain, FlaskConical, Mountain, Navigation, RotateCcw, Waves } from 'lucide-react';
 import type { ZoneWithTelemetry } from '../types';
-import type { EarlyWarningAlert } from '../types';
 import type { SandboxInputs } from '../services/sandbox';
 import { InteractiveMap } from './InteractiveMap';
 import { RISK_PALETTE } from '../utils/riskEngine';
@@ -13,7 +12,6 @@ interface SimulationWorkspaceProps {
   inputs: SandboxInputs;
   onInputsChange: (inputs: SandboxInputs) => void;
   onReset: () => void;
-  simulationAlert: EarlyWarningAlert | null;
 }
 
 interface SliderProps {
@@ -52,7 +50,6 @@ export const SimulationWorkspace: React.FC<SimulationWorkspaceProps> = ({
   inputs,
   onInputsChange,
   onReset,
-  simulationAlert,
 }) => {
   const [filterHazard, setFilterHazard] = useState<'ALL' | 'HIGH_SEVERE' | 'LANDSLIDE' | 'FLOOD'>('ALL');
   const level = selectedZone?.assessment.overallLevel;
@@ -170,24 +167,6 @@ export const SimulationWorkspace: React.FC<SimulationWorkspaceProps> = ({
             <div className="mt-3 flex items-start gap-2 rounded-lg border border-sky-200 bg-sky-50 p-2.5 text-[10px] leading-relaxed text-sky-950">
               <Navigation className="mt-0.5 h-3.5 w-3.5 shrink-0" />
               <span>Rainfall, terrain, and river-flow inputs update this watershed only. Live readings are unchanged; this is a preview, not an official warning.</span>
-            </div>
-            <div className="mt-4 border-t border-stone-200 pt-3">
-              <h4 className="text-[10px] font-bold uppercase tracking-wider text-stone-700">Alert for this situation</h4>
-              {simulationAlert ? (
-                <div className="mt-2 border-l-2 border-orange-600 bg-orange-50 px-3 py-2.5">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className={`border px-2 py-0.5 text-[10px] font-bold ${palette.badgeBg} ${palette.badgeText} ${palette.badgeBorder}`}>{simulationAlert.level} · {simulationAlert.compositeScore}/100</span>
-                    <span className="text-[10px] font-semibold uppercase text-stone-600">{simulationAlert.hazardType.replaceAll('_', ' ')}</span>
-                  </div>
-                  <p className="mt-2 text-[11px] font-bold leading-snug text-stone-900">{simulationAlert.headline}</p>
-                  <p className="mt-1 text-[10px] leading-relaxed text-stone-700">{simulationAlert.recommendation}</p>
-                  <p className="mt-2 text-[9px] font-semibold text-orange-900">Preview only · no alert is sent</p>
-                </div>
-              ) : (
-                <p className="mt-2 border border-stone-200 bg-white px-3 py-2.5 text-[10px] leading-relaxed text-stone-600">
-                  This situation remains below the High warning threshold. Continue monitoring; increasing rainfall or saturation may change the alert.
-                </p>
-              )}
             </div>
           </section>
         )}

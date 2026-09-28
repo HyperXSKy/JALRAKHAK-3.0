@@ -357,6 +357,7 @@ export default function App() {
         currentView={currentView}
         onViewChange={setCurrentView}
         alertCount={alerts.length}
+        simulationAlertCount={simulationAlerts.length}
         onOpenAlerts={() => setIsAlertsDrawerOpen(true)}
         onCheckMyArea={handleCheckMyArea}
         isLocating={isLocating}
@@ -410,7 +411,6 @@ export default function App() {
           inputs={sandboxInputs}
           onInputsChange={setSandboxInputs}
           onReset={() => setSandboxInputs(DEFAULT_SANDBOX_INPUTS)}
-          simulationAlert={generatedSimulationAlert}
         />
       ) : currentView === 'ALERTS' ? (
         <AlertsWorkspace
@@ -581,6 +581,7 @@ export default function App() {
         isOpen={isAlertsDrawerOpen}
         onClose={() => setIsAlertsDrawerOpen(false)}
         alerts={alerts}
+        simulationAlerts={simulationAlerts}
         onSelectZoneById={handleSelectZoneById}
         onAcknowledgeAlert={handleAcknowledgeAlert}
       />

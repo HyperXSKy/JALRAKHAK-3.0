@@ -176,14 +176,14 @@ export const AlertsWorkspace: React.FC<AlertsWorkspaceProps> = ({ alerts, simula
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2 text-xs font-bold text-stone-900">
               <AlertTriangle className="h-4 w-4 text-sky-700" />
-              Simulation preview <span className="font-mono text-stone-500">{simulationAlerts.length}</span>
+              Simulation alerts <span className="font-mono text-stone-500">{simulationAlerts.length}</span>
             </div>
             <button type="button" onClick={onOpenSimulation} className="flex items-center gap-1 text-[11px] font-bold text-sky-800 hover:text-sky-950">
               Open simulation <ExternalLink className="h-3 w-3" />
             </button>
           </div>
           {simulationAlerts.length === 0 ? (
-            <p className="border border-stone-200 bg-white px-4 py-4 text-[11px] text-stone-600">Current sandbox inputs do not produce a high or severe preview alert.</p>
+            <p className="border border-sky-200 bg-sky-50 px-4 py-4 text-[11px] text-sky-950">Simulation only: current scenario inputs do not produce a high or severe alert. Live advisories are listed above.</p>
           ) : (
             <div className="divide-y divide-stone-200 border-y border-stone-200 bg-white">
               {simulationAlerts.map((alert) => (

@@ -3,9 +3,7 @@ import L from 'leaflet';
 import 'leaflet.heat';
 import { ZoneWithTelemetry, RiskLevel } from '../types';
 import { RISK_PALETTE } from '../utils/riskEngine';
-import { fetchHLSInundationMap, HLSInundationMapResponse } from '../services/backend';
 import {
-  ShieldAlert,
   Mountain,
   Waves,
   MapPin,
@@ -14,7 +12,6 @@ import {
   Compass,
   Layers,
   Globe,
-  Check,
   Eye,
   X,
   Map as MapIcon,
@@ -125,17 +122,12 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   const baseTileLayerRef = useRef<L.TileLayer | null>(null);
   const labelsTileLayerRef = useRef<L.TileLayer | null>(null);
   const heatLayerRef = useRef<L.HeatLayer | null>(null);
-  const inundationLayerRef = useRef<L.LayerGroup | null>(null);
   const userMarkerRef = useRef<L.Marker | null>(null);
   const layerMenuRef = useRef<HTMLDivElement>(null);
 
   const [baseLayer, setBaseLayer] = useState<BaseLayerType>('light');
   const [showLabels, setShowLabels] = useState<boolean>(true);
   const [showHeatmap, setShowHeatmap] = useState<boolean>(false);
-  const [showHlsScreen, setShowHlsScreen] = useState<boolean>(false);
-  const [hlsMap, setHlsMap] = useState<HLSInundationMapResponse | null>(null);
-  const [isLoadingHlsMap, setIsLoadingHlsMap] = useState(false);
-  const [hlsMapError, setHlsMapError] = useState<string | null>(null);
   const [isLayerMenuOpen, setIsLayerMenuOpen] = useState<boolean>(false);
   const [isFullMap, setIsFullMap] = useState<boolean>(false);
 
@@ -192,10 +184,8 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     baseTileLayerRef.current = initialBaseLayer;
 
     const layerGroup = L.layerGroup().addTo(map);
-    const inundationLayer = L.layerGroup().addTo(map);
     mapInstanceRef.current = map;
     layerGroupRef.current = layerGroup;
-    inundationLayerRef.current = inundationLayer;
 
     const t1 = setTimeout(() => {
       map.invalidateSize();
@@ -223,67 +213,8 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       }
       baseTileLayerRef.current = null;
       labelsTileLayerRef.current = null;
-      inundationLayerRef.current = null;
     };
   }, []);
-
-  useEffect(() => {
-    if (!showHlsScreen || simulationMode || !selectedZone) {
-      setHlsMap(null);
-      setHlsMapError(null);
-      setIsLoadingHlsMap(false);
-      return;
-    }
-
-    const controller = new AbortController();
-    setIsLoadingHlsMap(true);
-    setHlsMapError(null);
-    void fetchHLSInundationMap(selectedZone.center[0], selectedZone.center[1], controller.signal)
-      .then((result) => setHlsMap(result))
-      .catch((error: unknown) => {
-        if (controller.signal.aborted) return;
-        setHlsMap(null);
-        setHlsMapError(error instanceof Error ? error.message : 'HLS spatial screen unavailable');
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setIsLoadingHlsMap(false);
-      });
-    return () => controller.abort();
-  }, [showHlsScreen, simulationMode, selectedZone?.id]);
-
-  useEffect(() => {
-    const layer = inundationLayerRef.current;
-    if (!layer) return;
-    layer.clearLayers();
-    if (!showHlsScreen || !hlsMap) return;
-
-    const renderer = L.canvas({ padding: 0.5 });
-    const orderedCells = [...hlsMap.cells].sort(
-      (left, right) => left.estimatedHlsFraction - right.estimatedHlsFraction
-    );
-    orderedCells.forEach((cell) => {
-      if (!isValidLatLng(cell.latitude, cell.longitude)) return;
-      const score = cell.estimatedHlsFraction;
-      const color = score >= 0.5
-        ? '#0c4a6e'
-        : score >= 0.3
-          ? '#0369a1'
-          : score >= hlsMap.highFractionCutoff
-            ? '#0891b2'
-            : score >= 0.08
-              ? '#38bdf8'
-              : '#bae6fd';
-      L.circleMarker([cell.latitude, cell.longitude], {
-        renderer,
-        radius: 5,
-        color,
-        weight: 0,
-        fillColor: color,
-        fillOpacity: 0.7,
-        interactive: false,
-      }).addTo(layer);
-    });
-  }, [showHlsScreen, hlsMap]);
 
   useEffect(() => {
     const map = mapInstanceRef.current;
@@ -502,35 +433,33 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       const isHigh = zone.assessment.overallLevel === 'High';
       const isWarmAlert = isHigh || isSevere;
 
-      const markerHtml = `
-        <div class="relative cursor-pointer group select-none">
-          ${isWarmAlert
-          ? `<div class="absolute -inset-2.5 rounded-full ${isSevere ? 'bg-orange-600/30 animate-ping' : 'bg-orange-500/20'
-          }"></div>`
-          : ''
-        }
-          <div class="relative flex items-center gap-1.5 px-2.5 py-1 rounded-full shadow-sm transition-transform duration-200 group-hover:scale-105 border ${isSelected
-          ? 'bg-stone-900 text-white border-orange-500 ring-2 ring-orange-500/40'
-          : `${palette.badgeBg} ${palette.badgeText} ${palette.badgeBorder}`
-        }">
-            <span class="w-2 h-2 rounded-full ${palette.dotColor} shrink-0"></span>
-            <span class="text-xs font-semibold whitespace-nowrap">${zone.name.split('-')[0].trim()}</span>
-            <span class="text-[10px] font-mono opacity-80 pl-0.5 border-l border-current/20">
-              ${zone.weather.currentRateMmPerHour.toFixed(1)}mm/h
-            </span>
+      const showMarkerLabel = isSelected || isWarmAlert;
+      const markerHtml = showMarkerLabel
+        ? `
+          <div class="relative cursor-pointer group select-none">
+            ${isWarmAlert ? `<div class="absolute -inset-2 rounded-full ${isSevere ? 'bg-red-600/25 animate-ping' : 'bg-orange-500/20'}"></div>` : ''}
+            <div class="relative flex items-center gap-1.5 px-2.5 py-1 rounded-full shadow-sm border ${isSelected
+              ? 'bg-[#193653] text-white border-cyan-400 ring-2 ring-cyan-500/30'
+              : `${palette.badgeBg} ${palette.badgeText} ${palette.badgeBorder}`
+            }">
+              <span class="w-2 h-2 rounded-full ${palette.dotColor} shrink-0"></span>
+              <span class="text-xs font-semibold whitespace-nowrap">${zone.name.split('-')[0].trim()}</span>
+              <span class="text-[10px] font-mono opacity-80 pl-1 border-l border-current/20">${zone.assessment.overallLevel}</span>
+            </div>
           </div>
-        </div>
-      `;
+        `
+        : `<div class="h-3.5 w-3.5 rounded-full border-2 border-white ${palette.dotColor} shadow-[0_1px_5px_rgba(15,23,42,0.45)]"></div>`;
 
       const customIcon = L.divIcon({
         html: markerHtml,
         className: 'custom-leaflet-marker',
-        iconSize: [120, 28],
-        iconAnchor: [60, 14],
+        iconSize: showMarkerLabel ? [148, 30] : [20, 20],
+        iconAnchor: showMarkerLabel ? [74, 15] : [10, 10],
       });
 
       try {
-        const marker = L.marker(zone.center as [number, number], { icon: customIcon });
+        const marker = L.marker(zone.center as [number, number], { icon: customIcon })
+          .bindTooltip(`${zone.name} · ${zone.assessment.overallLevel} risk`, { direction: 'top', offset: [0, -8] });
 
         const popupHtml = `
           <div class="p-3.5 max-w-[280px] font-sans text-stone-900">
@@ -545,23 +474,33 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
             
             <div class="grid grid-cols-2 gap-2 p-2 mb-3 bg-stone-50 rounded border border-stone-200 text-xs">
               <div>
-                <span class="text-stone-700 block text-[10px] uppercase font-semibold">${simulationMode && isSelected ? 'Simulated Rain' : 'Live Rain'}</span>
+                <span class="text-stone-700 block text-[10px] uppercase font-semibold">${simulationMode && isSelected ? 'Scenario now' : 'Rain now'}</span>
                 <span class="font-bold text-stone-900">${zone.weather.currentRateMmPerHour.toFixed(1)} mm/h</span>
               </div>
               <div>
-                <span class="text-stone-700 block text-[10px] uppercase font-semibold">24h Total</span>
+                <span class="text-stone-700 block text-[10px] uppercase font-semibold">Past 24h</span>
                 <span class="font-bold text-stone-900">${zone.weather.last24hMm.toFixed(1)} mm</span>
               </div>
               <div>
-                <span class="text-stone-700 block text-[10px] uppercase font-semibold">Landslide</span>
+                <span class="text-stone-700 block text-[10px] uppercase font-semibold">Next 24h</span>
+                <span class="font-bold text-stone-900">${zone.weather.forecastNext24hMm.toFixed(1)} mm</span>
+              </div>
+              <div>
+                <span class="text-stone-700 block text-[10px] uppercase font-semibold">Landslide · LSI</span>
                 <span class="font-bold ${zone.assessment.landslideScore >= 60 ? 'text-orange-700' : 'text-stone-800'}">
                   ${zone.assessment.landslideScore}/100
                 </span>
               </div>
               <div>
-                <span class="text-stone-700 block text-[10px] uppercase font-semibold">Flood</span>
+                <span class="text-stone-700 block text-[10px] uppercase font-semibold">Flash flood · FFI</span>
                 <span class="font-bold ${zone.assessment.floodScore >= 60 ? 'text-orange-700' : 'text-stone-800'}">
                   ${zone.assessment.floodScore}/100
+                </span>
+              </div>
+              <div class="col-span-2 border-t border-stone-200 pt-2">
+                <span class="text-stone-700 block text-[10px] uppercase font-semibold">XGBoost flood-risk estimate</span>
+                <span class="font-bold text-cyan-800">
+                  ${zone.fusion?.floodRiskModel ? `${zone.fusion.floodRiskModel.riskPercent.toFixed(1)}%` : 'Not available'}
                 </span>
               </div>
             </div>
@@ -765,79 +704,29 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         </div>
       )}
 
-      {/* Floating Map Controls & Filters */}
-      <div className={`absolute z-10 flex flex-wrap items-center gap-1.5 glass-dock border border-white/70 p-1.5 rounded-xl shadow-md text-xs ${(onGoHome || onScanLocation) ? 'top-16 left-4' : 'top-4 left-4'}`}>
-
-        <span className="text-stone-700 font-bold px-2 uppercase text-[10px] tracking-wider">Layer View:</span>
-        <button
-          id="map-filter-all"
-          onClick={() => onFilterChange('ALL')}
-          className={`tactile-btn px-2.5 py-1 rounded-lg font-semibold transition cursor-pointer ${filterHazard === 'ALL'
-              ? 'bg-stone-900 text-white shadow-xs'
-              : 'text-stone-700 hover:text-stone-950 hover:bg-white/80'
-            }`}
-        >
-          All Zones ({zones.length})
-        </button>
-        <button
-          id="map-filter-high-severe"
-          onClick={() => onFilterChange('HIGH_SEVERE')}
-          className={`tactile-btn px-2.5 py-1 rounded-lg font-semibold flex items-center gap-1 transition cursor-pointer ${filterHazard === 'HIGH_SEVERE'
-              ? 'bg-gradient-to-r from-orange-600 to-red-600 text-white shadow-xs'
-              : 'text-orange-700 hover:bg-orange-50/80'
-            }`}
-        >
-          <ShieldAlert className="w-3 h-3" />
-          High/Severe Only
-        </button>
-        <button
-          id="map-filter-landslide"
-          onClick={() => onFilterChange('LANDSLIDE')}
-          className={`tactile-btn px-2.5 py-1 rounded-lg font-semibold flex items-center gap-1 transition cursor-pointer ${filterHazard === 'LANDSLIDE'
-              ? 'bg-stone-800 text-white shadow-xs'
-              : 'text-stone-700 hover:text-stone-950 hover:bg-white/80'
-            }`}
-        >
-          <Mountain className="w-3 h-3 text-orange-500" />
-          Landslide Focus
-        </button>
-        <button
-          id="map-filter-flood"
-          onClick={() => onFilterChange('FLOOD')}
-          className={`tactile-btn px-2.5 py-1 rounded-lg font-semibold flex items-center gap-1 transition cursor-pointer ${filterHazard === 'FLOOD'
-              ? 'bg-stone-800 text-white shadow-xs'
-              : 'text-stone-700 hover:text-stone-950 hover:bg-white/80'
-            }`}
-        >
-          <Waves className="w-3 h-3 text-orange-500" />
-          Flood Focus
-        </button>
-
-        <div className="h-4 w-px bg-stone-200/80 mx-1 hidden sm:block" />
-
-        {/* Quick Toggle: Composite Risk Heatmap */}
-        <button
-          id="btn-toggle-risk-heatmap"
-          onClick={() => setShowHeatmap((prev) => !prev)}
-          title="Overlay composite risk score heatmap across Assam basins"
-          className={`tactile-btn px-2.5 py-1 rounded-lg font-semibold flex items-center gap-1.5 transition cursor-pointer ${showHeatmap
-              ? 'bg-gradient-to-r from-orange-500 via-orange-600 to-red-600 text-white shadow-sm shadow-orange-500/30 border border-orange-400/40'
-              : 'bg-white/80 text-stone-700 hover:text-stone-950 hover:bg-white border border-stone-200/80'
-            }`}
-        >
-          <Flame
-            className={`w-3.5 h-3.5 transition-colors ${showHeatmap ? 'text-amber-200 fill-amber-200' : 'text-orange-600'
-              }`}
-          />
-          <span>Risk Heatmap</span>
-          <span
-            className={`text-[9px] px-1 py-0.5 rounded font-bold uppercase tracking-wider ${showHeatmap ? 'bg-black/25 text-white' : 'bg-stone-200/80 text-stone-700'
-              }`}
+      {/* Map filters */}
+      <section
+        aria-label="Map display options"
+        className={`absolute z-10 w-[min(22rem,calc(100vw-1rem))] rounded-xl border border-white/80 bg-white/95 p-3 shadow-lg backdrop-blur-md ${(onGoHome || onScanLocation) ? 'top-16 left-2 sm:left-4' : 'top-4 left-2 sm:left-4'}`}
+      >
+        <div className="flex items-center gap-2">
+          <label htmlFor="map-zone-filter" className="shrink-0 text-xs font-bold text-stone-800">Show areas</label>
+          <select
+            id="map-zone-filter"
+            value={filterHazard}
+            onChange={(event) => onFilterChange(event.target.value as 'ALL' | 'HIGH_SEVERE' | 'LANDSLIDE' | 'FLOOD')}
+            className="min-w-0 flex-1 rounded-lg border border-stone-300 bg-white px-2.5 py-2 text-xs font-semibold text-stone-800 focus:border-cyan-700 focus:outline-none focus:ring-2 focus:ring-cyan-700/20"
           >
-            {showHeatmap ? 'ON' : 'OFF'}
-          </span>
-        </button>
-      </div>
+            <option value="ALL">All monitored areas ({zones.length})</option>
+            <option value="HIGH_SEVERE">High and severe risk</option>
+            <option value="LANDSLIDE">Landslide risk</option>
+            <option value="FLOOD">Flood risk</option>
+          </select>
+        </div>
+        <p className="mt-2 text-[11px] leading-snug text-stone-600">
+          Select an area on the map to see its rainfall and risk details.
+        </p>
+      </section>
 
       {/* Map Control Cluster (Layer Selector & Zoom Controls) */}
       <div className="absolute top-4 right-4 z-20 flex flex-col items-end gap-2">
@@ -850,11 +739,11 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                 ? 'bg-stone-900 text-white border-stone-800'
                 : 'glass-card text-stone-800 hover:bg-white'
               }`}
-            title="Toggle Map Layers: Terrain Elevation & Satellite Imagery"
+            title="Choose map style and overlays"
           >
             <Layers className="w-4 h-4 text-orange-500" />
             <span className="hidden sm:inline">
-              {BASE_LAYERS[baseLayer].label}
+              {baseLayer === 'light' ? 'Street map' : baseLayer === 'terrain' ? 'Terrain' : 'Satellite'}
             </span>
             <span className="sm:hidden">Layers</span>
           </button>
@@ -863,202 +752,82 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           {isLayerMenuOpen && (
             <div
               id="map-layer-popover"
-              className="absolute right-0 top-full mt-2 w-[min(18rem,calc(100vw-2rem))] max-h-[calc(100dvh-6rem)] overflow-y-auto glass-modal border border-white/80 rounded-3xl shadow-2xl p-3.5 text-stone-900 z-30"
+              className="absolute right-0 top-full mt-2 w-[min(19rem,calc(100vw-1rem))] max-h-[calc(100dvh-6rem)] overflow-y-auto rounded-xl border border-stone-200 bg-white p-3 text-stone-900 shadow-xl z-30"
             >
-              <div className="flex items-center justify-between pb-2 mb-2 border-b border-stone-200/70">
-                <div className="flex items-center gap-1.5">
-                  <div className="p-1 rounded-md bg-orange-100/80 text-orange-600">
-                    <Layers className="w-3.5 h-3.5" />
-                  </div>
-                  <span className="text-xs font-bold uppercase tracking-wider text-stone-800">
-                    Map Layers & Data
-                  </span>
+              <div className="mb-3 flex items-center justify-between border-b border-stone-200 pb-2">
+                <div>
+                  <h2 className="text-sm font-bold text-stone-900">Map appearance</h2>
+                  <p className="text-[11px] text-stone-600">Choose a background and optional overlays.</p>
                 </div>
                 <button
+                  type="button"
                   onClick={() => setIsLayerMenuOpen(false)}
-                  className="p-1 rounded-lg text-stone-400 hover:text-stone-800 hover:bg-stone-100 transition cursor-pointer"
-                  title="Close Menu"
+                  className="flex h-8 w-8 items-center justify-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-700"
+                  title="Close map appearance"
+                  aria-label="Close map appearance"
                 >
-                  <X className="w-3.5 h-3.5" />
+                  <X className="h-4 w-4" />
                 </button>
               </div>
 
-              {/* Base Layer Options */}
-              <div className="space-y-1.5 mb-3">
-                <span className="text-[10px] font-bold text-stone-500 uppercase tracking-wider block mb-1">
-                  Base Map Provider
-                </span>
-
+              <fieldset className="mb-3">
+                <legend className="mb-1.5 text-xs font-bold text-stone-800">Background map</legend>
+                <div className="grid grid-cols-3 gap-1.5">
                 {(['light', 'terrain', 'satellite'] as BaseLayerType[]).map((layerKey) => {
                   const opt = BASE_LAYERS[layerKey];
                   const isActive = baseLayer === layerKey;
                   return (
                     <button
                       key={layerKey}
+                      type="button"
+                      aria-pressed={isActive}
                       onClick={() => {
                         setBaseLayer(layerKey);
                       }}
-                      className={`tactile-btn w-full text-left p-3 rounded-2xl border transition flex items-start gap-2.5 cursor-pointer ${isActive
-                          ? 'border-orange-500 bg-orange-50/70 text-stone-950 ring-1 ring-orange-400/40 shadow-xs'
-                          : 'border-stone-200/80 bg-white/70 hover:border-stone-300 hover:bg-white text-stone-700'
-                        }`}
+                      className={`flex min-h-16 flex-col items-center justify-center gap-1 rounded-lg border px-1.5 py-2 text-center text-[11px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-700 ${isActive
+                        ? 'border-cyan-700 bg-cyan-50 text-cyan-950'
+                        : 'border-stone-200 bg-white text-stone-700 hover:bg-stone-50'
+                      }`}
                     >
-                      <div className="mt-0.5 shrink-0">
-                        {layerKey === 'light' && <MapIcon className="w-4 h-4 text-stone-600" />}
-                        {layerKey === 'terrain' && <Mountain className="w-4 h-4 text-amber-600" />}
-                        {layerKey === 'satellite' && <Globe className="w-4 h-4 text-sky-600" />}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-2">
-                          <span className="min-w-0 break-words text-xs font-bold leading-snug">{opt.label}</span>
-                          {isActive && <Check className="w-3.5 h-3.5 text-orange-600 shrink-0" />}
-                        </div>
-                        <p className="text-[11px] text-stone-600 mt-1 leading-snug line-clamp-3 break-words">
-                          {opt.description}
-                        </p>
-                        <span className="text-[10px] text-stone-500 mt-1 inline-block font-mono leading-snug break-words">
-                          Source: {opt.provider}
-                        </span>
-                      </div>
+                      {layerKey === 'light' && <MapIcon className="h-4 w-4" />}
+                      {layerKey === 'terrain' && <Mountain className="h-4 w-4" />}
+                      {layerKey === 'satellite' && <Globe className="h-4 w-4" />}
+                      <span>{layerKey === 'light' ? 'Street' : layerKey === 'terrain' ? 'Terrain' : 'Satellite'}</span>
+                      <span className="sr-only">{opt.provider}</span>
                     </button>
                   );
                 })}
-              </div>
+                </div>
+              </fieldset>
 
-              {/* Overlays & Analytics Section */}
-              <div className="pt-2.5 border-t border-stone-200/70 space-y-2">
-                <span className="text-[10px] font-bold text-stone-500 uppercase tracking-wider block">
-                  Overlays & Analytics
-                </span>
-
-                {/* Composite Risk Heatmap Toggle Card */}
-                <label className="flex items-start justify-between p-2.5 rounded-xl border border-stone-200/80 bg-white/80 hover:bg-white hover:border-orange-300 cursor-pointer text-xs transition shadow-2xs">
-                  <div className="flex items-start gap-2.5">
-                    <div className="p-1.5 rounded-lg bg-orange-100 text-orange-600 mt-0.5 shrink-0 shadow-2xs">
-                      <Flame className="w-3.5 h-3.5" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-bold text-stone-900">Composite Risk Heatmap</span>
-                        {showHeatmap && (
-                          <span className="text-[9px] px-1.5 py-0.2 rounded font-bold bg-orange-600 text-white shadow-2xs">
-                            ACTIVE
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-[11px] text-stone-600 leading-tight mt-0.5">
-                        Thermal gradient overlay weighted by composite scores (0-100)
-                      </p>
-                      <div className="mt-1.5 w-36 h-2 rounded-full bg-gradient-to-r from-yellow-300 via-amber-400 via-orange-500 via-red-500 to-red-900 border border-stone-200 shadow-inner" />
-                    </div>
-                  </div>
+              <fieldset className="space-y-1 border-t border-stone-200 pt-2">
+                <legend className="mb-1 text-xs font-bold text-stone-800">Map overlays</legend>
+                <label className="flex items-center justify-between gap-3 rounded-lg px-2 py-2 text-xs hover:bg-stone-50">
+                  <span className="flex items-center gap-2 font-medium text-stone-800">
+                    <Flame className="h-4 w-4 text-orange-600" />
+                    Risk heatmap
+                  </span>
                   <input
                     id="checkbox-risk-heatmap-popover"
                     type="checkbox"
                     checked={showHeatmap}
-                    onChange={(e) => setShowHeatmap(e.target.checked)}
-                    className="w-4 h-4 mt-1 rounded text-orange-600 focus:ring-orange-500 border-stone-300 accent-orange-600 cursor-pointer shrink-0"
+                    onChange={(event) => setShowHeatmap(event.target.checked)}
+                    className="h-4 w-4 accent-orange-600"
                   />
                 </label>
-
-                {!simulationMode && (
-                  <label className={`flex items-start justify-between p-2.5 rounded-xl border text-xs transition shadow-2xs ${selectedZone?.id === 'zone-assam-guwahati-metro' ? 'border-cyan-200 bg-cyan-50/70 hover:bg-white hover:border-cyan-400 cursor-pointer' : 'border-stone-200 bg-stone-100/70 opacity-70'}`}>
-                    <div className="flex items-start gap-2.5">
-                      <div className="p-1.5 rounded-lg bg-cyan-100 text-cyan-800 mt-0.5 shrink-0">
-                        <Waves className="w-3.5 h-3.5" />
-                      </div>
-                      <div>
-                        <span className="font-bold text-stone-900">HLS Water-Signal Screen</span>
-                        <p className="text-[11px] text-stone-600 leading-tight mt-0.5">
-                          Experimental · ~500 m cells · Guwahati only
-                        </p>
-                      </div>
-                    </div>
-                    <input
-                      id="checkbox-hls-screen-map"
-                      type="checkbox"
-                      checked={showHlsScreen}
-                      disabled={selectedZone?.id !== 'zone-assam-guwahati-metro'}
-                      onChange={(event) => setShowHlsScreen(event.target.checked)}
-                      className="w-4 h-4 mt-1 accent-cyan-700 cursor-pointer shrink-0"
-                    />
-                  </label>
-                )}
-
-                {/* Place & River Labels Toggle */}
-                <label className="flex items-center justify-between p-2 rounded-xl hover:bg-white/80 cursor-pointer text-xs transition">
-                  <div className="flex items-center gap-2">
-                    <Eye className="w-3.5 h-3.5 text-stone-600" />
-                    <span className="font-semibold text-stone-800">Place & River Labels</span>
-                  </div>
+                <label className="flex items-center justify-between gap-3 rounded-lg px-2 py-2 text-xs hover:bg-stone-50">
+                  <span className="flex items-center gap-2 font-medium text-stone-800">
+                    <Eye className="h-4 w-4 text-stone-600" />
+                    Place labels on satellite
+                  </span>
                   <input
                     type="checkbox"
                     checked={showLabels}
-                    onChange={(e) => setShowLabels(e.target.checked)}
-                    className="w-4 h-4 rounded text-orange-600 focus:ring-orange-500 border-stone-300 accent-orange-600 cursor-pointer"
+                    onChange={(event) => setShowLabels(event.target.checked)}
+                    className="h-4 w-4 accent-cyan-700"
                   />
                 </label>
-              </div>
-
-              {/* Quick Actions Section */}
-              <div className="pt-2.5 border-t border-stone-200/70 space-y-2">
-                <span className="text-[10px] font-bold text-stone-500 uppercase tracking-wider block">
-                  Quick Actions
-                </span>
-
-                {/* Scan My Location Button */}
-                {onScanLocation && (
-                  <button
-                    id="btn-layer-scan-location"
-                    onClick={() => {
-                      onScanLocation();
-                      setIsLayerMenuOpen(false);
-                    }}
-                    disabled={isLocating}
-                    className={`w-full flex items-center gap-2.5 p-2.5 rounded-xl border text-xs font-semibold transition cursor-pointer ${
-                      isLocating
-                        ? 'border-orange-300 bg-orange-50/60 text-orange-400 cursor-not-allowed'
-                        : 'border-orange-400/60 bg-gradient-to-r from-orange-50 to-amber-50 text-orange-700 hover:border-orange-500 hover:from-orange-100 hover:to-amber-100 shadow-2xs'
-                    }`}
-                    title="Detect your current GPS position and find the nearest monitoring zone"
-                  >
-                    <div className="p-1.5 rounded-lg bg-orange-100 text-orange-600 shrink-0">
-                      <LocateFixed className={`w-3.5 h-3.5 ${isLocating ? 'animate-spin' : ''}`} />
-                    </div>
-                    <div className="text-left">
-                      <div className="font-bold text-stone-900">
-                        {isLocating ? 'Scanning...' : 'Scan My Location'}
-                      </div>
-                      <p className="text-[11px] text-stone-600 leading-tight font-normal">
-                        Detect GPS position &amp; check nearest hazard zone
-                      </p>
-                    </div>
-                  </button>
-                )}
-
-                {/* Back to Homepage Button */}
-                {onGoHome && (
-                  <button
-                    id="btn-layer-go-home"
-                    onClick={() => {
-                      onGoHome();
-                      setIsLayerMenuOpen(false);
-                    }}
-                    className="w-full flex items-center gap-2.5 p-2.5 rounded-xl border border-stone-200/80 bg-white/80 text-stone-700 hover:border-stone-400 hover:bg-stone-50 text-xs font-semibold transition cursor-pointer shadow-2xs"
-                    title="Return to the HydroShield landing page"
-                  >
-                    <div className="p-1.5 rounded-lg bg-stone-100 text-stone-600 shrink-0">
-                      <Home className="w-3.5 h-3.5" />
-                    </div>
-                    <div className="text-left">
-                      <div className="font-bold text-stone-900">Back to Homepage</div>
-                      <p className="text-[11px] text-stone-600 leading-tight font-normal">
-                        Return to the HydroShield landing page
-                      </p>
-                    </div>
-                  </button>
-                )}
-              </div>
+              </fieldset>
             </div>
           )}
         </div>
@@ -1095,7 +864,8 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           <button
             id="btn-map-fit-bounds"
             onClick={handleResetBounds}
-            title="Fit All Monitored Basins"
+            title="Show all monitored areas"
+            aria-label="Show all monitored areas"
             className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-700 hover:text-orange-600 hover:bg-stone-100/80 transition cursor-pointer"
           >
             <Compass className="w-4 h-4" />
@@ -1103,10 +873,10 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         </div>
       </div>
 
-      {/* Tint Progression & Heatmap Legend */}
-      <div className="absolute bottom-4 left-4 z-10 glass-card border border-white/80 p-3.5 rounded-2xl shadow-lg max-w-[360px]">
+      {/* Map key */}
+      <div className="absolute bottom-2 left-2 z-10 w-[min(22rem,calc(100vw-1rem))] rounded-xl border border-white/90 bg-white/95 p-3 shadow-lg backdrop-blur-md sm:bottom-4 sm:left-4">
         <div className="flex items-center justify-between gap-2 mb-2">
-          <span className="text-[10px] uppercase tracking-wider font-bold text-stone-700">Early Warning Severity Scale</span>
+          <span className="text-xs font-bold text-stone-900">Area risk key</span>
           {showHeatmap && (
             <span className="text-[10px] font-bold text-orange-700 flex items-center gap-1 bg-orange-50/90 px-1.5 py-0.5 rounded-full border border-orange-200/80 shadow-2xs">
               <Flame className="w-3 h-3 text-orange-600 fill-orange-600" /> Heatmap Active
@@ -1128,13 +898,12 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           })}
         </div>
 
-        {/* Continuous Composite Score Gradient Bar (Active when Heatmap is toggled) */}
         {showHeatmap && (
           <div className="mt-2.5 pt-2 border-t border-stone-200/70">
             <div className="flex items-center justify-between text-[10px] font-bold text-stone-700 mb-1">
               <span className="flex items-center gap-1">
                 <Flame className="w-3 h-3 text-orange-600" />
-                Composite Risk Thermal Field:
+                Combined risk shading
               </span>
               <span className="font-mono text-orange-700 font-bold">0 &rarr; 100 Score</span>
             </div>
@@ -1148,28 +917,12 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           </div>
         )}
 
-        {showHlsScreen && (
-          <div className="mt-2.5 border-t border-stone-200/70 pt-2">
-            <div className="flex items-center justify-between text-[10px] font-bold text-stone-700">
-              <span>HLS source-fraction estimate</span>
-              <span>{isLoadingHlsMap ? 'Loading grid…' : `${hlsMap?.cells.length.toLocaleString() ?? 0} cells`}</span>
-            </div>
-            <div className="mt-1 h-2 rounded-full border border-stone-200 bg-gradient-to-r from-sky-200 via-cyan-500 to-sky-950" />
-            <div className="mt-1 flex justify-between text-[9px] text-stone-500">
-              <span>Lower signal</span><span>Higher signal</span>
-            </div>
-            <p className="mt-1.5 text-[10px] leading-tight text-stone-600">
-              {hlsMapError || hlsMap?.targetCaveat || 'Model screening surface only; not a confirmed flood extent or warning.'}
-            </p>
-          </div>
-        )}
-
         <p className="mt-2 text-[10px] text-stone-600 border-t border-stone-200/70 pt-1.5 leading-tight font-normal">
           {showHeatmap
-            ? 'Continuous thermal gradient reflects multi-parameter composite risk scores across all monitored Assam basins and slopes.'
+            ? 'Shading shows combined risk scores. Area colors show each zone’s overall risk.'
             : simulationMode
-              ? 'The selected watershed reflects sandbox inputs. Other regions continue to show live assessments.'
-              : 'Zones show watershed boundaries tinted by composite risk formula. Click any polygon or marker for live telemetry.'}
+              ? 'The selected area reflects your test scenario; other areas keep their current assessments.'
+              : 'Area colors show overall risk. Select an area to see rainfall and risk details.'}
         </p>
       </div>
     </div>

@@ -8,6 +8,7 @@ interface TopNavProps {
   currentView?: AppView;
   onViewChange?: (view: AppView) => void;
   alertCount: number;
+  simulationAlertCount: number;
   onOpenAlerts: () => void;
   onCheckMyArea: () => void;
   isLocating: boolean;
@@ -27,26 +28,28 @@ export const TopNav: React.FC<TopNavProps> = ({
   currentView,
   onViewChange,
   alertCount,
+  simulationAlertCount,
   onOpenAlerts,
   onCheckMyArea,
   isLocating,
 }) => {
   return (
-    <header className="glass-dock sticky top-0 z-30 px-4 py-2 border-b rounded-b-2xl">
-      <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => onViewChange && onViewChange('LANDING')}
-                className="text-base font-bold text-[#193653] leading-none hover:text-blue-700 transition cursor-pointer text-left"
-              >
-                JALRAKSHAK
-              </button>
-            </div>
-          </div>
-        </div>
-        <nav aria-label="Primary" className="flex flex-wrap items-center gap-1">
+    <header className="glass-dock sticky top-0 z-30 border-b px-3 py-2 sm:px-5">
+      <div className="mx-auto flex max-w-7xl items-center justify-between gap-2">
+        <button
+          type="button"
+          onClick={() => onViewChange && onViewChange('LANDING')}
+          aria-label="Jalrakshak home"
+          className="flex min-w-0 shrink-0 items-center gap-2.5 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-600 focus-visible:ring-offset-2"
+        >
+          <img
+            src="/jalrakshak%20Logo.png"
+            alt=""
+            className="h-10 w-10 rounded-full border-2 border-white object-cover shadow-sm ring-1 ring-cyan-200"
+          />
+          <span className="text-sm font-extrabold leading-tight text-[#193653] sm:text-base">JALRAKSHAK</span>
+        </button>
+        <nav aria-label="Primary" className="flex min-w-0 items-center justify-end gap-1 sm:gap-1.5">
           {([
             { view: 'DASHBOARD', label: 'Map', icon: LayoutDashboard },
             { view: 'SIMULATION', label: 'Simulation', icon: FlaskConical },
@@ -57,36 +60,40 @@ export const TopNav: React.FC<TopNavProps> = ({
               type="button"
               onClick={() => onViewChange?.(view)}
               aria-current={currentView === view ? 'page' : undefined}
-              className={`flex items-center gap-1.5 px-2.5 py-2 text-xs font-bold transition ${currentView === view ? 'bg-stone-900 text-white' : 'text-stone-700 hover:bg-white/80'}`}
+              title={label}
+              aria-label={label}
+              className={`flex h-9 items-center gap-1.5 rounded-lg px-2 sm:px-2.5 text-xs font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-600 focus-visible:ring-offset-1 ${currentView === view ? 'bg-[#193653] text-white shadow-sm' : 'text-stone-700 hover:bg-white/80'}`}
             >
               <Icon className="h-3.5 w-3.5" />
-              <span>{label}</span>
-              {view === 'ALERTS' && <span className="font-mono">{alertCount}</span>}
+              <span className="hidden min-[520px]:inline">{label}</span>
+              {view === 'ALERTS' && <span className="font-mono">{alertCount + simulationAlertCount}</span>}
             </button>
           ))}
-          <span className="mx-1 h-6 border-l border-stone-300" />
+          <span aria-hidden="true" className="mx-0.5 h-6 border-l border-stone-300 sm:mx-1" />
           <button
             type="button"
             onClick={onCheckMyArea}
             disabled={isLocating}
             aria-label="Check my area"
-            className="tactile-btn flex items-center gap-1.5 px-3 py-2 rounded-lg border border-stone-200 bg-white/80 text-stone-800 text-xs font-bold hover:bg-white disabled:opacity-60 cursor-pointer"
+            title="Check my area"
+            className="tactile-btn flex h-9 items-center gap-1.5 rounded-lg border border-stone-200 bg-white/80 px-2 sm:px-3 text-xs font-bold text-stone-800 hover:bg-white disabled:opacity-60 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-600 focus-visible:ring-offset-1"
           >
             {isLocating ? <LoaderCircle className="w-4 h-4 animate-spin text-orange-600" /> : <MapPin className="w-4 h-4 text-orange-600" />}
-            <span>Check area</span>
+            <span className="hidden min-[520px]:inline">Check area</span>
           </button>
           <button
             type="button"
             onClick={onOpenAlerts}
-            aria-label={`Open active alert list${alertCount ? `, ${alertCount} active` : ''}`}
-            className={`tactile-btn flex items-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-bold cursor-pointer ${alertCount > 0
+            aria-label={`Open alert list: ${alertCount} live${simulationAlertCount ? `, ${simulationAlertCount} simulation only` : ''}`}
+            title="Open active alerts"
+            className={`tactile-btn flex h-9 items-center gap-1.5 rounded-lg border px-2 sm:px-3 text-xs font-bold cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-600 focus-visible:ring-offset-1 ${alertCount + simulationAlertCount > 0
               ? 'border-orange-600 bg-orange-600 text-white hover:bg-orange-700'
               : 'border-stone-200 bg-white/80 text-stone-800 hover:bg-white'
               }`}
           >
-            <Bell className={`w-4 h-4 ${alertCount > 0 ? 'text-white' : 'text-stone-600'}`} />
-            <span>Active</span>
-            <span className="min-w-4 text-center">{alertCount}</span>
+            <Bell className={`w-4 h-4 ${alertCount + simulationAlertCount > 0 ? 'text-white' : 'text-stone-600'}`} />
+            <span className="hidden min-[520px]:inline">Active</span>
+            <span className="min-w-4 text-center">{alertCount + simulationAlertCount}</span>
           </button>
         </nav>
       </div>
