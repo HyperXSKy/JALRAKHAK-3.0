@@ -55,6 +55,7 @@ export const ZoneDetailPanel: React.FC<ZoneDetailPanelProps> = ({
   const isHighOrSevere =
     zone.assessment.overallLevel === 'High' || zone.assessment.overallLevel === 'Severe';
   const floodRiskModel = zone.fusion?.floodRiskModel;
+  const floodModelHoldout = floodRiskModel?.model.chronologicalHoldout;
 
   const historyData = zone.weather.dailyHistory.filter((item) => !item.isForecast).map((item) => ({
     name: item.date,
@@ -146,8 +147,8 @@ export const ZoneDetailPanel: React.FC<ZoneDetailPanelProps> = ({
                 <div className="h-full rounded-full bg-orange-600" style={{ width: `${zone.assessment.floodScore}%` }} />
               </div>
             </div>
-            <div title="XGBoost model estimate of flood risk" className="min-w-0 rounded-lg border border-cyan-200 bg-cyan-50/70 p-2">
-              <span className="block truncate text-[10px] font-semibold text-stone-700">XGBoost · flood</span>
+            <div title="XGBoost flood-risk estimate based on rainfall and river-flow data" className="min-w-0 rounded-lg border border-cyan-200 bg-cyan-50/70 p-2">
+              <span className="block truncate text-[10px] font-semibold text-stone-700">XGBoost · flood risk</span>
               <strong className="mt-1 block truncate font-mono text-lg leading-none text-stone-950">
                 {floodRiskModel ? `${floodRiskModel.riskPercent.toFixed(1)}%` : '—'}
               </strong>
@@ -411,6 +412,11 @@ export const ZoneDetailPanel: React.FC<ZoneDetailPanelProps> = ({
                 ? floodRiskModel.scoreMeaning
                 : 'Score not available. Please wait a few seconds and try again.'}
             </p>
+            {floodModelHoldout?.precision != null && floodModelHoldout.recall != null && (
+              <p className="mt-1 text-[10px] text-stone-500">
+                Historical holdout: {(floodModelHoldout.precision * 100).toFixed(1)}% precision / {(floodModelHoldout.recall * 100).toFixed(1)}% recall on rainfall/high-flow hazard labels.
+              </p>
+            )}
           </div>
 
           {/* Toggle Formula Breakdown */}

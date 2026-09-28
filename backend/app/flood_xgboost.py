@@ -104,13 +104,28 @@ class FloodRiskXGBoost:
         holdout = self.metadata.get("chronologicalHoldout", {})
         decision_threshold = float(holdout.get("decisionThreshold", 0.35))
         moderate_threshold = decision_threshold * 0.6
+        rain_threshold = max(25.0, 65.0 - float(zone.get("riverProximityKm") or 0) * 15.0)
+        forecast_rain = float(weather.get("forecastNext24hMm") or 0)
+        river_flow_ratio = (weather.get("riverDischarge") or {}).get("highFlowRatio")
+        rain_triggered = forecast_rain >= rain_threshold
+        river_triggered = river_flow_ratio is not None and float(river_flow_ratio) >= 1.0
+        risk_signal_triggered = rain_triggered or river_triggered
+        reported_probability = probability if risk_signal_triggered else min(probability, moderate_threshold * 0.99)
         return {
-            "probability": round(probability, 3),
-            "proxyProbability": round(probability, 3),
-            "riskPercent": round(probability * 100, 1),
-            "level": "Severe" if probability >= 0.95 else "High" if probability >= decision_threshold else "Moderate" if probability >= moderate_threshold else "Low",
+            "probability": round(reported_probability, 3),
+            "modelProbability": round(probability, 3),
+            "riskPercent": round(reported_probability * 100, 1),
+            "level": "Severe" if reported_probability >= 0.95 else "High" if reported_probability >= decision_threshold else "Moderate" if reported_probability >= moderate_threshold else "Low",
+            "riskSignalTriggered": risk_signal_triggered,
+            "riskSignalEvidence": {
+                "forecastRainMm": round(forecast_rain, 1),
+                "rainThresholdMm": round(rain_threshold, 1),
+                "rainTrigger": rain_triggered,
+                "riverHighFlowRatio": round(float(river_flow_ratio), 2) if river_flow_ratio is not None else None,
+                "riverTrigger": river_triggered,
+            },
             "decisionThreshold": round(decision_threshold, 3),
-            "scoreMeaning": "Estimated from historical rainfall and GloFAS river-flow patterns. It does not confirm flooding or river overflow.",
+            "scoreMeaning": "XGBoost flood-risk estimate based on historical rainfall and river-flow patterns. Moderate or higher requires supporting rainfall or high-flow evidence; this is not a direct flood observation.",
             "observedEventProbability": False,
             "model": self.metadata,
         }

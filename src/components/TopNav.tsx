@@ -40,7 +40,8 @@ export const TopNav: React.FC<TopNavProps> = ({
           type="button"
           onClick={() => onViewChange && onViewChange('LANDING')}
           aria-label="Jalrakshak home"
-          className="flex min-w-0 shrink-0 items-center gap-2.5 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-600 focus-visible:ring-offset-2"
+          title="Go to home"
+          className="flex min-w-0 shrink-0 cursor-pointer items-center gap-2.5 rounded-lg text-left transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-600 focus-visible:ring-offset-2"
         >
           <img
             src="/jalrakshak%20Logo.png"
@@ -62,7 +63,7 @@ export const TopNav: React.FC<TopNavProps> = ({
               aria-current={currentView === view ? 'page' : undefined}
               title={label}
               aria-label={label}
-              className={`flex h-9 items-center gap-1.5 rounded-lg px-2 sm:px-2.5 text-xs font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-600 focus-visible:ring-offset-1 ${currentView === view ? 'bg-[#193653] text-white shadow-sm' : 'text-stone-700 hover:bg-white/80'}`}
+              className={`flex h-9 cursor-pointer items-center gap-1.5 rounded-lg px-2 text-xs font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-600 focus-visible:ring-offset-1 sm:px-2.5 ${currentView === view ? 'bg-[#193653] text-white shadow-sm' : 'text-stone-700 hover:-translate-y-px hover:bg-white/80 hover:text-[#193653]'}`}
             >
               <Icon className="h-3.5 w-3.5" />
               <span className="hidden min-[520px]:inline">{label}</span>

@@ -19,6 +19,16 @@ textarea {
   -webkit-tap-highlight-color: transparent;
 }
 
+button:not(:disabled),
+a,
+[role="button"] {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
 :focus-visible {
   outline: 2px solid #0891b2;
   outline-offset: 2px;
@@ -65,6 +75,9 @@ textarea {
   border-radius: 999px;
   box-shadow: 0 2px 6px rgba(29, 67, 105, 0.09);
   transition: all 0.15s ease-in-out;
+}
+.tactile-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
 }
 .tactile-btn:active {
   transform: translateY(1px);
