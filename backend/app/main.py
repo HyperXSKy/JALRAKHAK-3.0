@@ -1,20 +1,33 @@
 from __future__ import annotations
 
 import asyncio
+import hmac
+import logging
 import os
 import json
 import smtplib
 import ssl
 import time
+from contextlib import asynccontextmanager
+from datetime import datetime
 from email.message import EmailMessage
 from typing import Any, Literal
 from urllib.parse import urlparse
 
 import httpx
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, Header, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
+from app.database import (
+    check_database,
+    get_assessment_history,
+    get_model_runs,
+    get_training_labels,
+    initialize_database,
+    record_assessments,
+    record_training_label,
+)
 from app.flood_xgboost import FLOOD_MODEL
 from app.fusion import fuse_zone
 from app.hls_inundation_model import HLS_INUNDATION_MODEL, METADATA_PATH as HLS_METADATA_PATH
@@ -36,6 +49,8 @@ TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID", "").strip()
 TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN", "").strip()
 TWILIO_FROM_NUMBER = os.getenv("TWILIO_FROM_NUMBER", "").strip()
 ALERT_SMS_TO = os.getenv("ALERT_SMS_TO", "").strip()
+DATA_INGEST_TOKEN = os.getenv("DATA_INGEST_TOKEN", "")
+logger = logging.getLogger(__name__)
 
 
 class AlertDeliveryRequest(BaseModel):
@@ -50,10 +65,25 @@ class AlertDeliveryRequest(BaseModel):
     compositeScore: int = Field(ge=0, le=100)
     channel: Literal["webhook", "email", "sms"] = "webhook"
 
+
+class TrainingLabelRequest(BaseModel):
+    observationId: int = Field(gt=0)
+    floodObserved: bool
+    source: str = Field(min_length=3, max_length=500)
+    eventObservedAt: datetime | None = None
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    await asyncio.to_thread(initialize_database)
+    yield
+
+
 app = FastAPI(
     title="JALRAKSHAK API",
     version="3.0.0",
     description="Integrated heavy-rainfall early warning and inundation risk service for SIH26071.",
+    lifespan=lifespan,
 )
 app.add_middleware(
     CORSMiddleware,
@@ -65,6 +95,15 @@ app.add_middleware(
 
 _dashboard_cache: dict[str, tuple[float, dict[str, Any]]] = {}
 CACHE_TTL_SECONDS = 90.0
+
+
+async def _persist_assessments(zones: list[dict[str, Any]], scenario: str, observed_at: str) -> None:
+    if scenario != "LIVE":
+        return
+    try:
+        await asyncio.to_thread(record_assessments, zones, scenario, observed_at)
+    except Exception:
+        logger.exception("Failed to persist assessment snapshot")
 
 
 async def _build_dashboard(scenario: Scenario) -> dict[str, Any]:
@@ -103,7 +142,7 @@ async def _build_dashboard(scenario: Scenario) -> dict[str, Any]:
 
     zones.sort(key=lambda item: item["assessment"]["compositeScore"], reverse=True)
     alerts.sort(key=lambda item: item["compositeScore"], reverse=True)
-    return {
+    payload = {
         "zones": zones,
         "alerts": alerts,
         "scenario": scenario,
@@ -111,6 +150,8 @@ async def _build_dashboard(scenario: Scenario) -> dict[str, Any]:
         "provider": "Open-Meteo + GloFAS + local ridge nowcast",
         "partialFailures": failures,
     }
+    await _persist_assessments(zones, scenario, payload["generatedAt"])
+    return payload
 
 
 async def get_dashboard(scenario: Scenario) -> dict[str, Any]:
@@ -127,7 +168,11 @@ async def get_dashboard(scenario: Scenario) -> dict[str, Any]:
 
 @app.get("/api/health")
 async def health() -> dict[str, str]:
-    return {"status": "ok", "service": "JALRAKSHAK"}
+    try:
+        await asyncio.to_thread(check_database)
+    except Exception:
+        return {"status": "degraded", "service": "JALRAKSHAK", "database": "unavailable"}
+    return {"status": "ok", "service": "JALRAKSHAK", "database": "ok"}
 
 
 @app.get("/api/alerts/delivery-status")
@@ -242,6 +287,58 @@ async def dashboard(
     return await get_dashboard(scenario)
 
 
+@app.get("/api/history")
+async def assessment_history(
+    zone_id: str | None = Query(None, min_length=1, max_length=120),
+    limit: int = Query(100, ge=1, le=500),
+) -> dict[str, Any]:
+    records = await asyncio.to_thread(get_assessment_history, zone_id, limit)
+    return {"records": records, "count": len(records)}
+
+
+@app.get("/api/models/runs")
+async def model_runs(limit: int = Query(20, ge=1, le=100)) -> dict[str, Any]:
+    runs = await asyncio.to_thread(get_model_runs, limit)
+    return {"runs": runs, "count": len(runs)}
+
+
+@app.post("/api/training/labels")
+async def submit_training_label(
+    label: TrainingLabelRequest,
+    x_data_ingest_token: str | None = Header(None),
+) -> dict[str, Any]:
+    if not DATA_INGEST_TOKEN:
+        raise HTTPException(status_code=503, detail="Verified-outcome ingestion is not configured")
+    if not x_data_ingest_token or not hmac.compare_digest(x_data_ingest_token, DATA_INGEST_TOKEN):
+        raise HTTPException(status_code=401, detail="Invalid data-ingest token")
+    try:
+        recorded = await asyncio.to_thread(
+            record_training_label,
+            label.observationId,
+            label.floodObserved,
+            label.source,
+            label.eventObservedAt,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    if not recorded:
+        raise HTTPException(status_code=404, detail="Observation not found")
+    return {"recorded": True, "observationId": label.observationId}
+
+
+@app.get("/api/training/labels")
+async def training_labels(
+    limit: int = Query(1000, ge=1, le=10000),
+    x_data_ingest_token: str | None = Header(None),
+) -> dict[str, Any]:
+    if not DATA_INGEST_TOKEN:
+        raise HTTPException(status_code=503, detail="Verified-outcome ingestion is not configured")
+    if not x_data_ingest_token or not hmac.compare_digest(x_data_ingest_token, DATA_INGEST_TOKEN):
+        raise HTTPException(status_code=401, detail="Invalid data-ingest token")
+    labels = await asyncio.to_thread(get_training_labels, limit)
+    return {"labels": labels, "count": len(labels)}
+
+
 @app.get("/api/zones/{zone_id}")
 async def zone_dashboard(zone_id: str, scenario: Scenario = Query("LIVE")) -> dict[str, Any]:
     zone = get_zone(zone_id)
@@ -249,6 +346,13 @@ async def zone_dashboard(zone_id: str, scenario: Scenario = Query("LIVE")) -> di
         raise HTTPException(status_code=404, detail="Monitoring zone not found")
     fused = await fuse_zone(zone, scenario)
     assessment = calculate_zone_risk(zone, fused["weather"])
+    snapshot = {
+        **zone,
+        "weather": fused["weather"],
+        "assessment": assessment,
+        "fusion": fused,
+    }
+    await _persist_assessments([snapshot], scenario, fused["fusedAt"])
     return {
         **zone,
         "weather": fused["weather"],
@@ -312,14 +416,14 @@ async def hls_inundation_screen(lat: float, lng: float) -> dict[str, Any]:
         )
         FLOOD_MODEL.add_river_context(nearest_zone, weather)
         screening = HLS_INUNDATION_MODEL.predict(lat, lng, weather)
-        flood_proxy = FLOOD_MODEL.predict(nearest_zone, weather)
+        flood_risk = FLOOD_MODEL.predict(nearest_zone, weather)
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
     return {
         **screening,
         "location": {"latitude": lat, "longitude": lng},
         "floodRiskModel": {
-            **flood_proxy,
+            **flood_risk,
             "nearestZoneName": nearest_zone["name"],
         },
         "weather": {

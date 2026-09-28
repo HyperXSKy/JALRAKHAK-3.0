@@ -1,8 +1,8 @@
 {
-  "model": "XGBoost binary classifier",
+  "model": "XGBoost flood-risk classifier",
   "dataSource": "Open-Meteo Archive hourly precipitation, GloFAS daily river discharge, and static zone terrain/soil/exposure data",
-  "label": "rainfall_or_high_river_flow_proxy",
-  "labelDefinition": "Positive when next-24h rainfall exceeds the zone threshold or next-day GloFAS discharge reaches that zone's historical 95th percentile; not an observed flood or bank-overflow label.",
+  "label": "rainfall_or_high_river_flow_hazard",
+  "labelDefinition": "Positive when next-24h rainfall exceeds the zone threshold or next-day GloFAS discharge reaches that zone's historical 95th percentile; this is a hydrometeorological hazard label, not a direct observation of inundation.",
   "periodStart": "2021-01-04",
   "periodEnd": "2022-07-30",
   "samples": 36672,
@@ -33,12 +33,30 @@
     "zone-assam-bongaigaon-aie": 844.69
   },
   "chronologicalHoldout": {
-    "accuracy": 0.866,
-    "precision": 0.666,
-    "recall": 0.556,
-    "positiveEvents": 1359,
-    "decisionThreshold": 0.7500000000000002,
-    "scalePosWeight": 32.22,
-    "f1": 0.606
-  }
+    "accuracy": 0.908,
+    "precision": 0.833,
+    "recall": 0.724,
+    "positiveEvents": 1206,
+    "predictedPositiveEvents": 1048,
+    "falsePositives": 175,
+    "decisionThreshold": 0.25000000000000006,
+    "f1": 0.775,
+    "f0_5": 0.809
+  },
+  "validation": {
+    "rows": 5504,
+    "precision": 0.877,
+    "recall": 0.31,
+    "decisionThreshold": 0.25000000000000006,
+    "thresholdObjective": "F0.5 to favor precision; minimum 30 predicted positives"
+  },
+  "split": {
+    "method": "Chronological 70% train, 15% validation, 15% untouched holdout; all zones for a timestamp stay together",
+    "trainRows": 25664,
+    "validationRows": 5504,
+    "holdoutRows": 5504,
+    "uniqueTimestamps": 4584,
+    "bestIteration": 176
+  },
+  "classWeighting": "None; preserves natural class prevalence for probability estimates"
 }

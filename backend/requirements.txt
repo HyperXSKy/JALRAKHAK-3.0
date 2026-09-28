@@ -7,3 +7,6 @@ python-multipart==0.0.20
 xgboost==3.0.2
 Pillow>=11.0.0
 scikit-learn==1.7.2
+SQLAlchemy==2.0.46
+psycopg[binary]>=3.2,<4
+alembic>=1.15,<2
