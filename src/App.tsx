@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { MONITORING_ZONES } from './data/zones';
 import { ZoneWithTelemetry, EarlyWarningAlert, RiskLevel, WeatherRainfallData } from './types';
 import { fetchZoneWeather, fetchLivePointWeather, SimulationScenario } from './services/openMeteo';
@@ -52,11 +52,13 @@ function fetchBrowserFallbackZones(scenario: SimulationScenario): Promise<ZoneWi
   const existingRequest = browserFallbackRequests.get(scenario);
   if (existingRequest) return existingRequest;
 
-  const request = Promise.all(
+  const request = Promise.allSettled(
     MONITORING_ZONES.map(async (zone) => {
       const weather = await fetchZoneWeather(zone, scenario);
       return { ...zone, weather, assessment: calculateZoneRisk(zone, weather) };
     })
+  ).then((results) =>
+    results.flatMap((result) => (result.status === 'fulfilled' ? [result.value] : []))
   );
   browserFallbackRequests.set(scenario, request);
   const clearRequest = () => {
@@ -73,6 +75,7 @@ export default function App() {
   const [zones, setZones] = useState<ZoneWithTelemetry[]>([]);
   const [selectedZone, setSelectedZone] = useState<ZoneWithTelemetry | null>(null);
   const [alerts, setAlerts] = useState<EarlyWarningAlert[]>([]);
+  const acknowledgedAlertIdsRef = useRef<Set<string>>(new Set());
   const [scenario, setScenario] = useState<SimulationScenario>('LIVE');
   const [sandboxInputs, setSandboxInputs] = useState<SandboxInputs>(DEFAULT_SANDBOX_INPUTS);
   const [simulationZoneId, setSimulationZoneId] = useState('');
@@ -136,7 +139,7 @@ export default function App() {
       const backendPayload = await fetchBackendDashboard(scenarioMode);
       setIsLiveApi(scenarioMode === 'LIVE' && backendPayload.zones.some((zone) => zone.weather.isLive));
       setZones(backendPayload.zones);
-      setAlerts(backendPayload.alerts);
+      setAlerts(backendPayload.alerts.filter((alert) => !acknowledgedAlertIdsRef.current.has(alert.id)));
       setLastSyncTime(new Date(backendPayload.generatedAt).toLocaleTimeString());
       setCountdownSeconds(60);
       setSelectedZone((prev) => {
@@ -167,7 +170,7 @@ export default function App() {
       results.sort((a, b) => b.assessment.compositeScore - a.assessment.compositeScore);
 
       setZones(results);
-      setAlerts(generatedAlerts);
+      setAlerts(generatedAlerts.filter((alert) => !acknowledgedAlertIdsRef.current.has(alert.id)));
       setLastSyncTime(new Date().toLocaleTimeString());
       setCountdownSeconds(60);
 
@@ -330,11 +333,13 @@ export default function App() {
     const found = zones.find((z) => z.id === zoneId);
     if (found) {
       setSelectedZone(found);
+      setCurrentView('DASHBOARD');
       setMobileTab('DETAIL');
     }
   };
 
   const handleAcknowledgeAlert = (alertId: string) => {
+    acknowledgedAlertIdsRef.current.add(alertId);
     setAlerts((prev) => prev.filter((a) => a.id !== alertId));
   };
 
