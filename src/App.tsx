@@ -100,6 +100,8 @@ export default function App() {
   const [geoError, setGeoError] = useState<string | null>(null);
 
   const [mobileTab, setMobileTab] = useState<'MAP' | 'LIST' | 'DETAIL'>('MAP');
+  const [isSectorListVisible, setIsSectorListVisible] = useState(true);
+  const [isZoneDetailsVisible, setIsZoneDetailsVisible] = useState(true);
 
   const loadLocationWeatherAndModel = (lat: number, lng: number, label: string) => {
     setIsLoadingUserWeather(true);
@@ -478,12 +480,12 @@ export default function App() {
               <div className="flex-1 flex flex-col lg:flex-row overflow-hidden relative min-h-0">
                 {/* Left Column: Sectors List */}
                 <div
-                  className={`h-full ${mobileTab === 'LIST' ? 'flex flex-1 w-full min-h-0' : 'hidden lg:flex min-h-0'
-                    }`}
+                  className={`h-full ${mobileTab === 'LIST' ? 'flex flex-1 w-full min-h-0' : 'hidden'} ${isSectorListVisible ? 'lg:flex lg:flex-none lg:w-80 xl:w-96' : 'lg:hidden'}`}
                 >
                   <SidebarZoneList
                     zones={zones}
                     selectedZone={selectedZone}
+                    onCollapse={() => setIsSectorListVisible(false)}
                     onSelectZone={(z) => {
                       setSelectedZone(z);
                       setMobileTab('DETAIL');
@@ -493,8 +495,7 @@ export default function App() {
 
                 {/* Center Column: Interactive Hero Map */}
                 <main
-                  className={`h-full flex-1 relative min-h-0 ${mobileTab === 'MAP' ? 'flex flex-1 w-full min-h-[400px]' : 'hidden lg:flex'
-                    }`}
+                  className={`h-full flex-1 relative min-h-0 ${mobileTab === 'LIST' ? 'hidden' : 'flex w-full min-h-[400px]'} lg:flex lg:min-h-0`}
                 >
                   <InteractiveMap
                     zones={zones}
@@ -509,18 +510,28 @@ export default function App() {
                     onGoHome={() => setCurrentView('LANDING')}
                     onScanLocation={handleCheckMyArea}
                     isLocating={isLocating}
+                    isSectorListVisible={isSectorListVisible}
+                    isZoneDetailsVisible={isZoneDetailsVisible}
+                    onToggleSectorList={() => setIsSectorListVisible((visible) => !visible)}
+                    onToggleZoneDetails={() => {
+                      const visible = !isZoneDetailsVisible;
+                      setIsZoneDetailsVisible(visible);
+                      setMobileTab(visible ? 'DETAIL' : 'MAP');
+                    }}
                   />
                 </main>
 
                 {/* Right Column: Selected Sector Deep Telemetry & Recharts */}
                 <div
-                  className={`h-full ${mobileTab === 'DETAIL' ? 'flex flex-1 w-full' : 'hidden lg:flex'
-                    }`}
+                  className={`h-full ${mobileTab === 'DETAIL' && isZoneDetailsVisible ? 'absolute inset-x-0 bottom-0 z-20 h-[68%] w-full shadow-2xl md:inset-y-0 md:left-auto md:right-0 md:h-full md:w-[min(45vw,24rem)]' : 'hidden'} ${isZoneDetailsVisible ? 'lg:relative lg:inset-auto lg:z-auto lg:flex lg:h-full lg:w-auto lg:flex-none lg:shadow-none' : 'lg:hidden'}`}
                 >
                   {selectedZone ? (
                     <ZoneDetailPanel
                       zone={selectedZone}
-                      onClose={() => setSelectedZone(null)}
+                      onClose={() => {
+                        setIsZoneDetailsVisible(false);
+                        setMobileTab('MAP');
+                      }}
                       onOpenAlertDelivery={() => setCurrentView('ALERTS')}
                       onOpenHowItWorks={() => setIsHowItWorksOpen(true)}
                     />

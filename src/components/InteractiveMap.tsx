@@ -18,9 +18,8 @@ import {
   Flame,
   Home,
   LocateFixed,
-  Maximize2,
-  Minimize2,
-  ArrowLeft,
+  PanelLeftOpen,
+  PanelRightOpen,
 } from 'lucide-react';
 
 export type BaseLayerType = 'light' | 'terrain' | 'satellite';
@@ -86,6 +85,10 @@ interface InteractiveMapProps {
   onScanLocation?: () => void;
   isLocating?: boolean;
   simulationMode?: boolean;
+  isSectorListVisible?: boolean;
+  isZoneDetailsVisible?: boolean;
+  onToggleSectorList?: () => void;
+  onToggleZoneDetails?: () => void;
 }
 
 // Coordinate safety validators to avoid Leaflet "Invalid LatLng object: (NaN, NaN)"
@@ -115,6 +118,10 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   onScanLocation,
   isLocating = false,
   simulationMode = false,
+  isSectorListVisible = true,
+  isZoneDetailsVisible = true,
+  onToggleSectorList,
+  onToggleZoneDetails,
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
@@ -129,17 +136,6 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   const [showLabels, setShowLabels] = useState<boolean>(true);
   const [showHeatmap, setShowHeatmap] = useState<boolean>(false);
   const [isLayerMenuOpen, setIsLayerMenuOpen] = useState<boolean>(false);
-  const [isFullMap, setIsFullMap] = useState<boolean>(false);
-
-    useEffect(() => {
-    if (!isFullMap) return;
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setIsFullMap(false);
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isFullMap]);
-
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (layerMenuRef.current && !layerMenuRef.current.contains(event.target as Node)) {
@@ -628,27 +624,14 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   return (
     <div
       id="interactive-map-wrapper"
-      className={`${isFullMap ? 'fixed inset-0 z-[60] h-[100dvh] w-screen' : 'relative h-full min-h-[480px] w-full flex-1'} bg-stone-100 overflow-hidden`}
+      className="relative h-full min-h-[480px] w-full flex-1 overflow-hidden bg-stone-100"
     >
       {/* Map DOM Canvas */}
-      <div ref={mapContainerRef} className="absolute inset-0 z-0 h-full w-full" style={{ minHeight: isFullMap ? '100dvh' : '480px' }} />
+      <div ref={mapContainerRef} className="absolute inset-0 z-0 h-full w-full" style={{ minHeight: '480px' }} />
 
       {/* ── Back to Home  &  My Location  ─ floating action row ── */}
-      {(isFullMap || onGoHome || onScanLocation) && (
+      {(onGoHome || onScanLocation) && (
         <div className="absolute top-4 left-4 z-20 flex items-center gap-2">
-
-          {isFullMap && (
-            <button
-              id="btn-map-return-dashboard"
-              onClick={() => setIsFullMap(false)}
-              title="Return to dashboard"
-              className="flex items-center gap-2 rounded-full border border-white/70 bg-white/95 px-3 py-2 text-xs font-bold text-stone-800 shadow-lg backdrop-blur-sm transition hover:bg-white cursor-pointer"
-            >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              <span>Back to dashboard</span>
-            </button>
-          )}
-
           {/* Back to Homepage */}
           {onGoHome && (
             <button
@@ -726,6 +709,28 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         <p className="mt-2 text-[11px] leading-snug text-stone-600">
           Select an area on the map to see its rainfall and risk details.
         </p>
+        {(!isSectorListVisible || !isZoneDetailsVisible) && (
+          <div className="mt-2 flex flex-wrap gap-1.5 border-t border-stone-200 pt-2">
+            {!isSectorListVisible && onToggleSectorList && (
+              <button
+                type="button"
+                onClick={onToggleSectorList}
+                className="flex min-h-8 items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-2.5 text-[11px] font-semibold text-stone-700 hover:bg-stone-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-700"
+              >
+                <PanelLeftOpen className="h-3.5 w-3.5" /> Show areas
+              </button>
+            )}
+            {!isZoneDetailsVisible && onToggleZoneDetails && (
+              <button
+                type="button"
+                onClick={onToggleZoneDetails}
+                className="flex min-h-8 items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-2.5 text-[11px] font-semibold text-stone-700 hover:bg-stone-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-700"
+              >
+                <PanelRightOpen className="h-3.5 w-3.5" /> Show details
+              </button>
+            )}
+          </div>
+        )}
       </section>
 
       {/* Map Control Cluster (Layer Selector & Zoom Controls) */}
@@ -831,16 +836,6 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
             </div>
           )}
         </div>
-
-        <button
-          id="btn-map-fullscreen"
-          onClick={() => setIsFullMap((current) => !current)}
-          title={isFullMap ? 'Exit full map view' : 'Open full map view'}
-          aria-label={isFullMap ? 'Exit full map view' : 'Open full map view'}
-          className="h-9 w-9 rounded-full border border-white/70 glass-card flex items-center justify-center text-stone-700 shadow-md transition hover:bg-white hover:text-blue-800 cursor-pointer"
-        >
-          {isFullMap ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-        </button>
 
         {/* Map Zoom & Center Control Buttons */}
         <div className="flex flex-col gap-1 glass-card border border-white/80 rounded-xl p-1 shadow-md">

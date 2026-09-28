@@ -22,6 +22,7 @@ import {
   ChevronDown,
   Info,
   Maximize2,
+  PanelRightClose,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -84,11 +85,14 @@ export const ZoneDetailPanel: React.FC<ZoneDetailPanelProps> = ({
             </span>
             {onClose && (
               <button
+                type="button"
                 onClick={onClose}
-                className="tactile-btn p-1 rounded-lg text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition cursor-pointer"
-                title="Close Panel"
+                aria-label="Hide area details"
+                className="tactile-btn flex h-8 items-center gap-1 rounded-lg border border-stone-200 bg-white px-2 text-[10px] font-semibold text-stone-600 hover:bg-stone-100 transition cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-700"
+                title="Hide area details"
               >
-                <ChevronDown className="w-4 h-4 rotate-90" />
+                <PanelRightClose className="h-3.5 w-3.5" />
+                <span>Hide</span>
               </button>
             )}
           </div>
