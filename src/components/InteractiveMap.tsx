@@ -3,6 +3,7 @@ import L from 'leaflet';
 import 'leaflet.heat';
 import { ZoneWithTelemetry, RiskLevel } from '../types';
 import { RISK_PALETTE } from '../utils/riskEngine';
+import { fetchHLSInundationMap, HLSInundationMapResponse } from '../services/backend';
 import {
   ShieldAlert,
   Mountain,
@@ -124,12 +125,17 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   const baseTileLayerRef = useRef<L.TileLayer | null>(null);
   const labelsTileLayerRef = useRef<L.TileLayer | null>(null);
   const heatLayerRef = useRef<L.HeatLayer | null>(null);
+  const inundationLayerRef = useRef<L.LayerGroup | null>(null);
   const userMarkerRef = useRef<L.Marker | null>(null);
   const layerMenuRef = useRef<HTMLDivElement>(null);
 
   const [baseLayer, setBaseLayer] = useState<BaseLayerType>('light');
   const [showLabels, setShowLabels] = useState<boolean>(true);
   const [showHeatmap, setShowHeatmap] = useState<boolean>(false);
+  const [showHlsScreen, setShowHlsScreen] = useState<boolean>(false);
+  const [hlsMap, setHlsMap] = useState<HLSInundationMapResponse | null>(null);
+  const [isLoadingHlsMap, setIsLoadingHlsMap] = useState(false);
+  const [hlsMapError, setHlsMapError] = useState<string | null>(null);
   const [isLayerMenuOpen, setIsLayerMenuOpen] = useState<boolean>(false);
   const [isFullMap, setIsFullMap] = useState<boolean>(false);
 
@@ -186,8 +192,10 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     baseTileLayerRef.current = initialBaseLayer;
 
     const layerGroup = L.layerGroup().addTo(map);
+    const inundationLayer = L.layerGroup().addTo(map);
     mapInstanceRef.current = map;
     layerGroupRef.current = layerGroup;
+    inundationLayerRef.current = inundationLayer;
 
     const t1 = setTimeout(() => {
       map.invalidateSize();
@@ -215,8 +223,67 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       }
       baseTileLayerRef.current = null;
       labelsTileLayerRef.current = null;
+      inundationLayerRef.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    if (!showHlsScreen || simulationMode || !selectedZone) {
+      setHlsMap(null);
+      setHlsMapError(null);
+      setIsLoadingHlsMap(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    setIsLoadingHlsMap(true);
+    setHlsMapError(null);
+    void fetchHLSInundationMap(selectedZone.center[0], selectedZone.center[1], controller.signal)
+      .then((result) => setHlsMap(result))
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) return;
+        setHlsMap(null);
+        setHlsMapError(error instanceof Error ? error.message : 'HLS spatial screen unavailable');
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setIsLoadingHlsMap(false);
+      });
+    return () => controller.abort();
+  }, [showHlsScreen, simulationMode, selectedZone?.id]);
+
+  useEffect(() => {
+    const layer = inundationLayerRef.current;
+    if (!layer) return;
+    layer.clearLayers();
+    if (!showHlsScreen || !hlsMap) return;
+
+    const renderer = L.canvas({ padding: 0.5 });
+    const orderedCells = [...hlsMap.cells].sort(
+      (left, right) => left.estimatedHlsFraction - right.estimatedHlsFraction
+    );
+    orderedCells.forEach((cell) => {
+      if (!isValidLatLng(cell.latitude, cell.longitude)) return;
+      const score = cell.estimatedHlsFraction;
+      const color = score >= 0.5
+        ? '#0c4a6e'
+        : score >= 0.3
+          ? '#0369a1'
+          : score >= hlsMap.highFractionCutoff
+            ? '#0891b2'
+            : score >= 0.08
+              ? '#38bdf8'
+              : '#bae6fd';
+      L.circleMarker([cell.latitude, cell.longitude], {
+        renderer,
+        radius: 5,
+        color,
+        weight: 0,
+        fillColor: color,
+        fillOpacity: 0.7,
+        interactive: false,
+      }).addTo(layer);
+    });
+  }, [showHlsScreen, hlsMap]);
 
   useEffect(() => {
     const map = mapInstanceRef.current;
@@ -894,6 +961,30 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                   />
                 </label>
 
+                {!simulationMode && (
+                  <label className={`flex items-start justify-between p-2.5 rounded-xl border text-xs transition shadow-2xs ${selectedZone?.id === 'zone-assam-guwahati-metro' ? 'border-cyan-200 bg-cyan-50/70 hover:bg-white hover:border-cyan-400 cursor-pointer' : 'border-stone-200 bg-stone-100/70 opacity-70'}`}>
+                    <div className="flex items-start gap-2.5">
+                      <div className="p-1.5 rounded-lg bg-cyan-100 text-cyan-800 mt-0.5 shrink-0">
+                        <Waves className="w-3.5 h-3.5" />
+                      </div>
+                      <div>
+                        <span className="font-bold text-stone-900">HLS Water-Signal Screen</span>
+                        <p className="text-[11px] text-stone-600 leading-tight mt-0.5">
+                          Experimental · ~500 m cells · Guwahati only
+                        </p>
+                      </div>
+                    </div>
+                    <input
+                      id="checkbox-hls-screen-map"
+                      type="checkbox"
+                      checked={showHlsScreen}
+                      disabled={selectedZone?.id !== 'zone-assam-guwahati-metro'}
+                      onChange={(event) => setShowHlsScreen(event.target.checked)}
+                      className="w-4 h-4 mt-1 accent-cyan-700 cursor-pointer shrink-0"
+                    />
+                  </label>
+                )}
+
                 {/* Place & River Labels Toggle */}
                 <label className="flex items-center justify-between p-2 rounded-xl hover:bg-white/80 cursor-pointer text-xs transition">
                   <div className="flex items-center gap-2">
@@ -1054,6 +1145,22 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
               <span>High (50-75)</span>
               <span>Severe (75-100)</span>
             </div>
+          </div>
+        )}
+
+        {showHlsScreen && (
+          <div className="mt-2.5 border-t border-stone-200/70 pt-2">
+            <div className="flex items-center justify-between text-[10px] font-bold text-stone-700">
+              <span>HLS source-fraction estimate</span>
+              <span>{isLoadingHlsMap ? 'Loading grid…' : `${hlsMap?.cells.length.toLocaleString() ?? 0} cells`}</span>
+            </div>
+            <div className="mt-1 h-2 rounded-full border border-stone-200 bg-gradient-to-r from-sky-200 via-cyan-500 to-sky-950" />
+            <div className="mt-1 flex justify-between text-[9px] text-stone-500">
+              <span>Lower signal</span><span>Higher signal</span>
+            </div>
+            <p className="mt-1.5 text-[10px] leading-tight text-stone-600">
+              {hlsMapError || hlsMap?.targetCaveat || 'Model screening surface only; not a confirmed flood extent or warning.'}
+            </p>
           </div>
         )}
 

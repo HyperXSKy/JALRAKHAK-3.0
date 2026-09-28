@@ -311,17 +311,19 @@ export const ZoneDetailPanel: React.FC<ZoneDetailPanelProps> = ({
 
           <div className="p-3.5 rounded-xl border border-stone-200/80 glass-card">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-bold text-stone-900">XGBoost rainfall + high-flow proxy</span>
-              {floodRiskModel && (
+              <span className="text-xs font-bold text-stone-900">XGBoost flood-risk score</span>
+              {floodRiskModel ? (
                 <span className="text-xs font-bold text-stone-800">
-                  {floodRiskModel.riskPercent.toFixed(1)}% score
+                  {floodRiskModel.riskPercent.toFixed(1)}%
                 </span>
+              ) : (
+                <span className="text-xs font-bold text-stone-500">Not available</span>
               )}
             </div>
             <p className="text-[11px] text-stone-600 mt-1 leading-relaxed">
               {floodRiskModel
                 ? floodRiskModel.scoreMeaning
-                : 'Model score unavailable; the formula-based flood index is shown above.'}
+                : 'Score not available. Please wait a few seconds and try again.'}
             </p>
           </div>
 

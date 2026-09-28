@@ -335,3 +335,31 @@ async def hls_inundation_screen(lat: float, lng: float) -> dict[str, Any]:
             "source": "Open-Meteo point forecast / interpolated observations",
         },
     }
+
+
+@app.get("/api/inundation/hls-map")
+async def hls_inundation_map(lat: float, lng: float) -> dict[str, Any]:
+    if not (-90 <= lat <= 90 and -180 <= lng <= 180):
+        raise HTTPException(status_code=422, detail="Coordinates are outside valid bounds")
+    try:
+        HLS_INUNDATION_MODEL.nearest_cell(lat, lng)
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    try:
+        weather = await fetch_model_forecast(lat, lng)
+        spatial_screen = HLS_INUNDATION_MODEL.predict_grid(weather)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    return {
+        **spatial_screen,
+        "location": {"latitude": lat, "longitude": lng},
+        "weather": {
+            "last24hMm": weather.get("last24hMm"),
+            "last72hMm": weather.get("last72hMm"),
+            "last168hMm": weather.get("last168hMm"),
+            "humidity24hPercent": weather.get("humidity24hPercent"),
+            "liveIsoTimestamp": weather.get("liveIsoTimestamp"),
+        },
+    }

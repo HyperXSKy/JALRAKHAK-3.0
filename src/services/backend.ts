@@ -100,6 +100,25 @@ export interface HLSInundationScreenResponse {
   floodRiskModel: FloodRiskModelOutput & { nearestZoneName: string };
 }
 
+export interface HLSInundationMapResponse {
+  cells: { latitude: number; longitude: number; estimatedHlsFraction: number }[];
+  cellSizeLatitudeDegrees: number;
+  cellSizeLongitudeDegrees: number;
+  coverage: { south: number; north: number; west: number; east: number };
+  highFractionCutoff: number;
+  target: string;
+  targetCaveat: string;
+  source: string;
+  operationalWarning: false;
+  weather: {
+    last24hMm: number;
+    last72hMm: number;
+    last168hMm?: number;
+    humidity24hPercent?: number;
+    liveIsoTimestamp?: string;
+  };
+}
+
 export async function fetchHLSInundationScreen(
   lat: number,
   lng: number
@@ -112,4 +131,20 @@ export async function fetchHLSInundationScreen(
     throw new Error(payload?.detail || `JALRAKSHAK model HTTP ${response.status}`);
   }
   return payload as HLSInundationScreenResponse;
+}
+
+export async function fetchHLSInundationMap(
+  lat: number,
+  lng: number,
+  signal?: AbortSignal
+): Promise<HLSInundationMapResponse> {
+  const response = await fetch(
+    `${BACKEND_BASE_URL}/api/inundation/hls-map?lat=${encodeURIComponent(lat)}&lng=${encodeURIComponent(lng)}`,
+    { signal }
+  );
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(payload?.detail || `JALRAKSHAK map HTTP ${response.status}`);
+  }
+  return payload as HLSInundationMapResponse;
 }

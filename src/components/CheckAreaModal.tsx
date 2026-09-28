@@ -225,19 +225,23 @@ export const CheckAreaModal: React.FC<CheckAreaModalProps> = ({
                 )}
               </div>
 
-              {floodRiskModel && (
-                <div className="p-3.5 glass-card border border-stone-200/80 rounded-xl space-y-1.5">
+              <div className="p-3.5 glass-card border border-stone-200/80 rounded-xl space-y-1.5">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs font-bold text-stone-800">XGBoost rainfall + high-flow proxy</span>
-                    <span className="text-xs font-bold text-stone-900">
-                      {floodRiskModel.riskPercent.toFixed(1)}% score
-                    </span>
+                    <span className="text-xs font-bold text-stone-800">XGBoost flood-risk score</span>
+                    {floodRiskModel ? (
+                      <span className="text-xs font-bold text-stone-900">
+                        {floodRiskModel.riskPercent.toFixed(1)}%
+                      </span>
+                    ) : (
+                      <span className="text-xs font-bold text-stone-500">Not available</span>
+                    )}
                   </div>
                   <p className="text-[11px] text-stone-600 leading-relaxed">
-                    Based on the {('nearestZoneName' in floodRiskModel && floodRiskModel.nearestZoneName) || nearestZone?.name || 'nearest monitored area'} profile. Trained on rainfall-threshold labels, not observed floods; this is not a calibrated flood probability.
+                    {floodRiskModel
+                      ? `${floodRiskModel.scoreMeaning} Area: ${('nearestZoneName' in floodRiskModel && floodRiskModel.nearestZoneName) || nearestZone?.name || 'nearest monitored area'}.`
+                      : 'Score not available. Please wait a few seconds and try again.'}
                   </p>
                 </div>
-              )}
 
               {/* Nearest Zone Card */}
               {nearestZone && (

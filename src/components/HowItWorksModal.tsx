@@ -111,7 +111,7 @@ export const HowItWorksModal: React.FC<HowItWorksModalProps> = ({
           <div className="p-4 rounded-xl border border-amber-200 bg-amber-50/70 space-y-1.5">
             <h4 className="font-bold text-stone-900">About the model scores</h4>
             <p className="text-[11px] text-stone-700 leading-relaxed">
-              GloFAS supplies modeled discharge in m³/s, not measured river height or bankfull stage. The XGBoost model combines rainfall triggers and historical high-flow proxy labels, not observed overflow events, so its score is not a calibrated flood probability. Neither score replaces official warnings.
+              GloFAS supplies modeled discharge in m³/s, not measured river height or bankfull stage. The XGBoost score is estimated from historical rainfall and high-flow patterns; it does not confirm flooding or overflow. Follow official warnings and local authority instructions.
             </p>
           </div>
 

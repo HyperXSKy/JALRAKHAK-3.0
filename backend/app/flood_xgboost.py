@@ -110,7 +110,7 @@ class FloodRiskXGBoost:
             "riskPercent": round(probability * 100, 1),
             "level": "Severe" if probability >= 0.95 else "High" if probability >= decision_threshold else "Moderate" if probability >= moderate_threshold else "Low",
             "decisionThreshold": round(decision_threshold, 3),
-            "scoreMeaning": "Score for rainfall-triggered or GloFAS high-flow proxy labels; not a calibrated probability of an observed flood or bank overflow.",
+            "scoreMeaning": "Estimated from historical rainfall and GloFAS river-flow patterns. It does not confirm flooding or river overflow.",
             "observedEventProbability": False,
             "model": self.metadata,
         }

@@ -106,7 +106,7 @@ export function calculateZoneRisk(zone: Zone, weather: WeatherRainfallData): Ris
   const riverProximityMultiplier = Number(
     Math.max(0.6, 2.4 - riverProximityClamped * 0.55).toFixed(2)
   );
-  // Elevation funnel proxy: lower elevation valley floors receive upstream watershed discharge
+  // Lower valley floors receive a stronger elevation multiplier.
   const elevationFactor = Number(
     Math.max(0.7, 2.0 - (Math.min(zone.elevation, 1500) / 1200) * 0.85).toFixed(2)
   );

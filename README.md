@@ -103,6 +103,14 @@ python -m uvicorn app.main:app --reload --port 8000
 - The HLS inundation screening model is limited to the Guwahati grid and should not be treated as an official flood warning.
 - If the API is unavailable, the dashboard may fall back to browser-side weather requests.
 
+## Experimental spatial screen
+
+- The map-layer menu includes an experimental HLS water-signal surface for the 5,751-cell Guwahati grid. It predicts the source CSV `mean` fraction from rainfall and terrain features; the label's physical meaning is undocumented, so this is not a confirmed inundation extent or flood probability.
+- The available Drive data includes 17 spatial-label batches and a separate 2023 label file. The baseline download in this workspace is a metadata manifest only; the referenced ERA5 feature tables and baseline `.joblib` model are not present, and the yearly-label, shared-folder, and terrain folders are empty. Those missing files cannot currently add training features or support a controlled baseline comparison.
+- [ML4Floods / WorldFloods](https://github.com/spaceml-org/ml4floods) offers pretrained Sentinel-2 flood segmentation models. Its WorldFloods data/model use is non-commercially licensed and its documented dataset is large; inference also requires the matching satellite imagery.
+- [NASA/IBM Prithvi Sen1Floods11](https://huggingface.co/ibm-nasa-geospatial/Prithvi-EO-1.0-100M-sen1floods11) is Apache-2.0 licensed and expects a six-band Sentinel-2 GeoTIFF. It is a possible future imagery-segmentation path, but those imagery inputs are not among the local Drive assets.
+- [Google Flood Forecasting API](https://developers.google.com/flood-forecasting) requires an approved API project and key. Google's public historical datasets include inundation history and global runoff reanalysis; they are useful for future validation but are not currently integrated.
+
 ## Common troubleshooting
 
 If Python cannot find the app package, make sure this environment variable is set before running uvicorn:
