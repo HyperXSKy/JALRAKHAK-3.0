@@ -547,6 +547,11 @@ export default function App() {
         onClose={() => setIsHowItWorksOpen(false)}
         inputs={sandboxInputs}
         onInputsChange={setSandboxInputs}
+        riverFlowThresholdM3s={
+          simulationTarget?.weather.riverDischarge?.highFlowThresholdM3s
+          ?? selectedZone?.weather.riverDischarge?.highFlowThresholdM3s
+          ?? null
+        }
       />
 
       <CheckAreaModal

@@ -148,6 +148,23 @@ export async function fetchLivePointWeather(
   lng: number,
   label: string = 'User Location'
 ): Promise<WeatherRainfallData> {
+  const backendUrl = (import.meta.env.VITE_BACKEND_URL || 'http://127.0.0.1:8000').replace(/\/$/, '');
+  const backendController = new AbortController();
+  const backendTimeoutId = setTimeout(() => backendController.abort(), 8000);
+  try {
+    const backendResponse = await fetch(
+      `${backendUrl}/api/weather/point?lat=${lat.toFixed(4)}&lng=${lng.toFixed(4)}`,
+      { signal: backendController.signal }
+    );
+    if (backendResponse.ok) {
+      return await backendResponse.json() as WeatherRainfallData;
+    }
+  } catch {
+    // Keep browser-side weather available when the backend cannot be reached.
+  } finally {
+    clearTimeout(backendTimeoutId);
+  }
+
   const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(4)}&longitude=${lng.toFixed(4)}&current=precipitation,rain,showers,weather_code,temperature_2m,relative_humidity_2m,wind_speed_10m&hourly=precipitation,rain,precipitation_probability,temperature_2m,relative_humidity_2m,wind_speed_10m&daily=precipitation_sum,precipitation_hours&past_days=7&forecast_days=7&timezone=auto`;
 
   const controller = new AbortController();

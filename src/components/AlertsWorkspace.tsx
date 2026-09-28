@@ -128,15 +128,6 @@ export const AlertsWorkspace: React.FC<AlertsWorkspaceProps> = ({ alerts, simula
 
         {testResult && <p role="status" className="mt-3 text-[11px] text-stone-600">{testResult}</p>}
 
-        {deliveryState !== 'ready' && (
-          <section className="mt-4 border-l-2 border-orange-600 bg-orange-50 px-4 py-3 text-xs text-orange-950">
-            <h2 className="font-bold">{deliveryState === 'unavailable' ? 'Delivery service unavailable' : 'Configure real delivery'}</h2>
-            <p className="mt-1 leading-relaxed">
-              Configure an HTTPS webhook, SMTP email, or Twilio SMS in the backend environment, then restart the API. Provider credentials and recipient addresses stay on the server. After setup, use <strong>Send test alert</strong> to verify the selected channel.
-            </p>
-          </section>
-        )}
-
         <section className="mt-5">
           <div className="mb-2 flex items-center gap-2 text-xs font-bold text-stone-900">
             <BellRing className="h-4 w-4 text-orange-700" />

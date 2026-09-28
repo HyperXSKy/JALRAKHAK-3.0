@@ -174,10 +174,25 @@ async def fetch_glofas_discharge(lat: float, lng: float) -> dict[str, Any] | Non
                 data = res.json()
         daily = data.get("daily") or {}
         discharge = daily.get("river_discharge") or []
+        dates = daily.get("time") or []
+        daily_values = [
+            {
+                "date": dates[index] if index < len(dates) else None,
+                "dischargeM3s": round(float(value), 1) if value is not None else None,
+            }
+            for index, value in enumerate(discharge[:5])
+        ]
+        numeric_values = [value["dischargeM3s"] for value in daily_values if value["dischargeM3s"] is not None]
         return {
             "source": "GloFAS via Open-Meteo Flood API",
-            "next5dM3s": [round(float(v or 0), 1) for v in discharge[:5]],
-            "peakM3s": round(max((float(v or 0) for v in discharge[:5]), default=0), 1),
+            "latitude": data.get("latitude"),
+            "longitude": data.get("longitude"),
+            "currentDate": daily_values[0]["date"] if daily_values else None,
+            "currentM3s": daily_values[0]["dischargeM3s"] if daily_values else None,
+            "nextDayM3s": daily_values[1]["dischargeM3s"] if len(daily_values) > 1 else None,
+            "daily": daily_values,
+            "next5dM3s": [value["dischargeM3s"] for value in daily_values],
+            "peakM3s": round(max(numeric_values), 1) if numeric_values else None,
         }
     except Exception:
         return None

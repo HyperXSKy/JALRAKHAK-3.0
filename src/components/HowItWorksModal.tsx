@@ -8,13 +8,21 @@ interface HowItWorksModalProps {
   onClose: () => void;
   inputs: SandboxInputs;
   onInputsChange: (inputs: SandboxInputs) => void;
+  riverFlowThresholdM3s: number | null;
 }
 
-export const HowItWorksModal: React.FC<HowItWorksModalProps> = ({ isOpen, onClose, inputs, onInputsChange }) => {
+export const HowItWorksModal: React.FC<HowItWorksModalProps> = ({
+  isOpen,
+  onClose,
+  inputs,
+  onInputsChange,
+  riverFlowThresholdM3s,
+}) => {
   const {
     rainRate: testRainRate,
     rain24h: test24hRain,
     rain72h: test72hRain,
+    riverDischargeM3s: testRiverDischargeM3s,
     slope: testSlope,
     riverKm: testRiverKm,
     saturation: testSaturation,
@@ -39,9 +47,16 @@ export const HowItWorksModal: React.FC<HowItWorksModalProps> = ({ isOpen, onClos
   const elevationFactor = Number(
     Math.max(0.7, 2.0 - (Math.min(testElevationM, 1500) / 1200) * 0.85).toFixed(2)
   );
+  const riverFlowRatio = riverFlowThresholdM3s != null && riverFlowThresholdM3s > 0
+    ? testRiverDischargeM3s / riverFlowThresholdM3s
+    : null;
+  const riverFlowFactor = riverFlowRatio == null
+    ? 1
+    : Number((1 + 0.5 * Math.min(2, Math.max(0, riverFlowRatio))).toFixed(2));
+  const riverFlowSliderMax = Math.max(100, Math.ceil((riverFlowThresholdM3s ?? 500) * 2 / 100) * 100);
   const calculatedFfi = Math.min(
     100,
-    Math.max(0, Math.round((floodAccum + floodInt) * riverFactor * elevationFactor * 0.4))
+    Math.max(0, Math.round((floodAccum + floodInt) * riverFactor * elevationFactor * riverFlowFactor * 0.4))
   );
   const ffiLevel = getRiskLevel(calculatedFfi);
 
@@ -89,14 +104,14 @@ export const HowItWorksModal: React.FC<HowItWorksModalProps> = ({ isOpen, onClos
               Data Ingestion &amp; Hydrological Model
             </h4>
             <p className="leading-relaxed text-stone-700">
-              JALRAKSHAK computes multi-hazard risk indices by coupling <strong>real-time atmospheric feeds from Open-Meteo</strong> (hourly precipitation rates, 24h &amp; 72h antecedent rainfall, convective rain showers) with <strong>geophysical catchment attributes</strong> (slope shear angle, valley drainage elevation, distance to primary riverbed, and soil saturation index).
+              JALRAKSHAK combines Open-Meteo rainfall with daily modeled GloFAS discharge and geophysical catchment attributes. River flow is compared with each watershed's historical 95th-percentile reference.
             </p>
           </div>
 
           <div className="p-4 rounded-xl border border-amber-200 bg-amber-50/70 space-y-1.5">
             <h4 className="font-bold text-stone-900">About the model scores</h4>
             <p className="text-[11px] text-stone-700 leading-relaxed">
-              The XGBoost score is trained on rainfall-threshold proxy labels, not recorded flood events, so it is not a calibrated flood probability. The HLS model estimates a source-data fraction whose meaning is undocumented and only covers the Guwahati grid. Neither score replaces official warnings.
+              GloFAS supplies modeled discharge in m³/s, not measured river height or bankfull stage. The XGBoost model combines rainfall triggers and historical high-flow proxy labels, not observed overflow events, so its score is not a calibrated flood probability. Neither score replaces official warnings.
             </p>
           </div>
 
@@ -131,7 +146,7 @@ export const HowItWorksModal: React.FC<HowItWorksModalProps> = ({ isOpen, onClos
                 <span>2. Flash Flood Index (FFI)</span>
               </div>
               <div className="p-3 bg-stone-100/80 rounded-lg border border-stone-200 font-mono text-[11px] text-stone-900 shadow-inner">
-                FFI = [(0.68 &times; A<sub>24h</sub> + 3.6 &times; I<sub>rate</sub>) &times; R<sub>river</sub> &times; E<sub>elevation</sub>] &times; 0.40
+                FFI = [(0.68 &times; A<sub>24h</sub> + 3.6 &times; I<sub>rate</sub>) &times; R<sub>river</sub> &times; E<sub>elevation</sub> &times; M<sub>flow</sub>] &times; 0.40
               </div>
               <ul className="space-y-1.5 text-[11px] text-stone-600 list-disc list-inside">
                 <li>
@@ -142,6 +157,9 @@ export const HowItWorksModal: React.FC<HowItWorksModalProps> = ({ isOpen, onClos
                 </li>
                 <li>
                   <strong className="text-stone-900">A<sub>24h</sub></strong> = 24-hour total precipitation runoff volume.
+                </li>
+                <li>
+                  <strong className="text-stone-900">M<sub>flow</sub></strong> = 1 + 0.5 &times; clamp(Q / Q<sub>95</sub>, 0, 2). Q<sub>95</sub> is a historical high-flow reference, not a bankfull threshold.
                 </li>
               </ul>
             </div>
@@ -270,6 +288,25 @@ export const HowItWorksModal: React.FC<HowItWorksModalProps> = ({ isOpen, onClos
 
               <div>
                 <label className="flex justify-between text-stone-700 font-semibold mb-1">
+                  <span>Daily River Discharge (Q)</span>
+                  <span className="font-bold font-mono text-stone-900">{testRiverDischargeM3s.toLocaleString()} m³/s</span>
+                </label>
+                <input
+                  type="range"
+                  min="0"
+                  max={riverFlowSliderMax}
+                  step={Math.max(1, Math.ceil(riverFlowSliderMax / 100))}
+                  value={Math.min(testRiverDischargeM3s, riverFlowSliderMax)}
+                  onChange={(e) => onInputsChange({ ...inputs, riverDischargeM3s: Number(e.target.value) })}
+                  className="w-full accent-cyan-700 cursor-pointer"
+                />
+                <span className="text-[10px] text-stone-500">
+                  Local Q<sub>95</sub>: {riverFlowThresholdM3s == null ? 'unavailable' : `${riverFlowThresholdM3s.toLocaleString()} m³/s`}
+                </span>
+              </div>
+
+              <div>
+                <label className="flex justify-between text-stone-700 font-semibold mb-1">
                   <span>Ground Elevation</span>
                   <span className="font-bold font-mono text-stone-900">{testElevationM} m</span>
                 </label>
@@ -312,6 +349,7 @@ export const HowItWorksModal: React.FC<HowItWorksModalProps> = ({ isOpen, onClos
                 <span className="text-[10px] uppercase font-bold text-stone-500 block">Flash Flood (FFI)</span>
                 <span className="text-base font-bold font-mono text-stone-900">{calculatedFfi}/100</span>
                 <span className="text-[10px] block font-bold text-orange-600">{ffiLevel}</span>
+                <span className="text-[9px] block text-stone-500">Flow ×{riverFlowFactor}</span>
               </div>
               <div className="border-l border-stone-200/80 pl-2">
                 <span className="text-[10px] uppercase font-bold text-stone-500 block">Composite Rating</span>

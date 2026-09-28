@@ -314,11 +314,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 Flash Flood Risk Index (FFI)
               </h3>
               <p className="text-xs text-stone-600 leading-relaxed">
-                Combines 24-hour rainfall, current rain intensity, river distance, and elevation.
+                Combines rainfall, river distance, elevation, and daily GloFAS flow relative to the watershed's historical high-flow reference.
               </p>
               <div className="pt-2">
                 <span className="inline-block px-2.5 py-1 rounded-lg bg-stone-100 text-[10px] font-mono text-stone-700 font-bold border border-stone-200">
-                  FFI = [(0.68 &times; A24 + 3.6 &times; I) &times; R_river &times; E_elevation] &times; 0.40
+                  FFI = [(0.68 &times; A24 + 3.6 &times; I) &times; R_river &times; E_elevation &times; M_flow] &times; 0.40
                 </span>
               </div>
             </div>

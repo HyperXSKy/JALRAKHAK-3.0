@@ -18,7 +18,7 @@ from pydantic import BaseModel, Field
 from app.flood_xgboost import FLOOD_MODEL
 from app.fusion import fuse_zone
 from app.hls_inundation_model import HLS_INUNDATION_MODEL, METADATA_PATH as HLS_METADATA_PATH
-from app.open_meteo import fetch_model_forecast
+from app.open_meteo import fetch_glofas_discharge, fetch_model_forecast
 from app.risk import calculate_zone_risk, generate_alert
 from app.zone_catalog import ZONES, get_zone
 
@@ -262,7 +262,22 @@ async def zone_dashboard(zone_id: str, scenario: Scenario = Query("LIVE")) -> di
 async def point_weather(lat: float, lng: float) -> dict[str, Any]:
     if not (-90 <= lat <= 90 and -180 <= lng <= 180):
         raise HTTPException(status_code=422, detail="Coordinates are outside valid bounds")
-    return await fetch_model_forecast(lat, lng)
+    weather, river_discharge = await asyncio.gather(
+        fetch_model_forecast(lat, lng),
+        fetch_glofas_discharge(lat, lng),
+    )
+    nearest_zone = min(
+        ZONES,
+        key=lambda zone: (zone["center"][0] - lat) ** 2
+        + ((zone["center"][1] - lng) * 0.89) ** 2,
+    )
+    weather["riverDischarge"] = river_discharge
+    FLOOD_MODEL.add_river_context(nearest_zone, weather)
+    return {
+        **weather,
+        "lastUpdated": time.strftime("%H:%M:%S UTC", time.gmtime()),
+        "dataQuality": "live",
+    }
 
 
 @app.get("/api/models/hls-inundation")
@@ -285,13 +300,18 @@ async def hls_inundation_screen(lat: float, lng: float) -> dict[str, Any]:
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
     try:
-        weather = await fetch_model_forecast(lat, lng)
-        screening = HLS_INUNDATION_MODEL.predict(lat, lng, weather)
+        weather, river_discharge = await asyncio.gather(
+            fetch_model_forecast(lat, lng),
+            fetch_glofas_discharge(lat, lng),
+        )
+        weather["riverDischarge"] = river_discharge
         nearest_zone = min(
             ZONES,
             key=lambda zone: (zone["center"][0] - lat) ** 2
             + ((zone["center"][1] - lng) * 0.89) ** 2,
         )
+        FLOOD_MODEL.add_river_context(nearest_zone, weather)
+        screening = HLS_INUNDATION_MODEL.predict(lat, lng, weather)
         flood_proxy = FLOOD_MODEL.predict(nearest_zone, weather)
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error

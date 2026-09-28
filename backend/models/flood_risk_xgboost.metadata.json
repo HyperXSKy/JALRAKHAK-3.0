@@ -1,11 +1,11 @@
 {
   "model": "XGBoost binary classifier",
-  "dataSource": "Open-Meteo Archive hourly precipitation plus static zone terrain/soil/exposure data",
-  "label": "rainfall_triggered_flood_risk_proxy",
-  "labelDefinition": "Broad next-24h rainfall threshold adjusted by river proximity; not an observed flood event label.",
-  "periodStart": "2021-01-01",
-  "periodEnd": "2025-12-31",
-  "samples": 116608,
+  "dataSource": "Open-Meteo Archive hourly precipitation, GloFAS daily river discharge, and static zone terrain/soil/exposure data",
+  "label": "rainfall_or_high_river_flow_proxy",
+  "labelDefinition": "Positive when next-24h rainfall exceeds the zone threshold or next-day GloFAS discharge reaches that zone's historical 95th percentile; not an observed flood or bank-overflow label.",
+  "periodStart": "2021-01-04",
+  "periodEnd": "2022-07-30",
+  "samples": 36672,
   "zones": 8,
   "features": [
     "current_rain_mm_h",
@@ -18,15 +18,27 @@
     "river_proximity_km",
     "soil_saturation_percent",
     "impervious_fraction",
-    "catchment_area_km2"
+    "catchment_area_km2",
+    "river_discharge_m3s",
+    "river_discharge_p95_ratio"
   ],
+  "riverFlowP95M3sByZone": {
+    "zone-assam-guwahati-metro": 5.35,
+    "zone-assam-dima-hasao": 5.93,
+    "zone-assam-majuli-island": 5.9,
+    "zone-assam-silchar-barak": 1068.54,
+    "zone-assam-kaziranga-kaliabor": 75.49,
+    "zone-assam-karbi-anglong-diphu": 4.81,
+    "zone-assam-dibrugarh-rohmoria": 3.59,
+    "zone-assam-bongaigaon-aie": 844.69
+  },
   "chronologicalHoldout": {
-    "accuracy": 0.974,
-    "precision": 0.132,
-    "recall": 0.394,
-    "positiveEvents": 193,
-    "decisionThreshold": 0.8500000000000002,
-    "scalePosWeight": 64.69,
-    "f1": 0.198
+    "accuracy": 0.866,
+    "precision": 0.666,
+    "recall": 0.556,
+    "positiveEvents": 1359,
+    "decisionThreshold": 0.7500000000000002,
+    "scalePosWeight": 32.22,
+    "f1": 0.606
   }
 }

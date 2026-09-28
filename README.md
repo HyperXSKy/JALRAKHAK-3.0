@@ -98,6 +98,8 @@ python -m uvicorn app.main:app --reload --port 8000
 ## Notes
 
 - The backend uses live upstream weather data, so values may vary depending on network and service availability.
+- River telemetry is modeled daily GloFAS discharge in m³/s from the nearest flood-grid river cell, not a measured water height or bankfull level; the API grid is approximately 5 km and can select a nearby main river. The FFI compares flow with a per-watershed historical 95th-percentile reference.
+- Flood-model labels combine rainfall triggers with next-day discharge reaching that historical high-flow reference. These are proxies, not observed flood or overflow events. GloFAS reanalysis coverage ends in July 2022; retrain with `python backend/train_flood_xgboost.py` after changing model features.
 - The HLS inundation screening model is limited to the Guwahati grid and should not be treated as an official flood warning.
 - If the API is unavailable, the dashboard may fall back to browser-side weather requests.
 

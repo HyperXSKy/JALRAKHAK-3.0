@@ -57,6 +57,9 @@ export const SimulationWorkspace: React.FC<SimulationWorkspaceProps> = ({
   const [filterHazard, setFilterHazard] = useState<'ALL' | 'HIGH_SEVERE' | 'LANDSLIDE' | 'FLOOD'>('ALL');
   const level = selectedZone?.assessment.overallLevel;
   const palette = level ? RISK_PALETTE[level] : null;
+  const riverFlowThreshold = selectedZone?.weather.riverDischarge?.highFlowThresholdM3s ?? null;
+  const riverFlowMax = Math.max(100, Math.ceil((riverFlowThreshold ?? 500) * 2 / 100) * 100);
+  const riverFlowStep = Math.max(1, Math.ceil(riverFlowMax / 100));
   const update = (key: keyof SandboxInputs, value: number) => onInputsChange({ ...inputs, [key]: value });
 
   return (
@@ -119,6 +122,16 @@ export const SimulationWorkspace: React.FC<SimulationWorkspaceProps> = ({
 
         <div className="mt-4 space-y-3 border-b border-stone-200 pb-4">
           <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-stone-500">
+            <Waves className="h-3.5 w-3.5 text-cyan-700" /> River flow
+          </div>
+          <Slider label="Daily discharge" value={inputs.riverDischargeM3s} unit=" m³/s" min={0} max={riverFlowMax} step={riverFlowStep} onChange={(value) => update('riverDischargeM3s', value)} />
+          <p className="text-[10px] text-stone-500">
+            Local high-flow reference: {riverFlowThreshold == null ? 'unavailable' : `${riverFlowThreshold.toLocaleString()} m³/s (P95)`}
+          </p>
+        </div>
+
+        <div className="mt-4 space-y-3 border-b border-stone-200 pb-4">
+          <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-stone-500">
             <Mountain className="h-3.5 w-3.5 text-emerald-700" /> Terrain
           </div>
           <Slider label="Slope" value={inputs.slope} unit="°" min={5} max={50} step={1} onChange={(value) => update('slope', value)} />
@@ -140,6 +153,11 @@ export const SimulationWorkspace: React.FC<SimulationWorkspaceProps> = ({
               <div><span className="block text-[9px] uppercase text-stone-500">FFI</span><strong className="font-mono text-sm">{selectedZone.assessment.floodScore}</strong></div>
               <div><span className="block text-[9px] uppercase text-stone-500">Overall</span><strong className="font-mono text-sm text-orange-700">{selectedZone.assessment.compositeScore}</strong></div>
             </div>
+            <div className="flex items-center justify-between border-y border-stone-200 py-2 text-[10px]">
+              <span className="text-stone-600">Simulated river discharge</span>
+              <strong className="font-mono text-stone-900">{inputs.riverDischargeM3s.toLocaleString()} m³/s · ×{selectedZone.assessment.floodBreakdown.riverFlowMultiplier}</strong>
+            </div>
+                          <span>Rainfall, terrain, and normalized river discharge feed the same risk engine used by live advisories.</span>
             <p className="text-[11px] leading-relaxed text-stone-700">{selectedZone.assessment.recommendedAction}</p>
             <div className="mt-3 flex items-start gap-2 border-l-2 border-sky-700 bg-sky-50 p-2.5 text-[10px] leading-relaxed text-sky-950">
               <Navigation className="mt-0.5 h-3.5 w-3.5 shrink-0" />

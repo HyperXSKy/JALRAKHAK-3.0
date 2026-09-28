@@ -192,7 +192,9 @@ async def fuse_zone(zone: dict, scenario: str = "LIVE") -> dict[str, Any]:
         "generationTimeMs": obs.get("generationTimeMs"),
         "liveIsoTimestamp": obs.get("liveIsoTimestamp"),
         "blended24hMm": blended_24,
+        "riverDischarge": glofas,
     }
+    FLOOD_MODEL.add_river_context(zone, weather)
     flood_risk = FLOOD_MODEL.predict(zone, weather)
 
     nowcast = {

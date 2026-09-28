@@ -243,7 +243,7 @@ export const ZoneDetailPanel: React.FC<ZoneDetailPanelProps> = ({
               />
             </div>
 
-            <div className="grid grid-cols-3 gap-1 text-[10px] text-stone-700 pt-1.5 border-t border-stone-200/60 font-mono">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 text-[10px] text-stone-700 pt-1.5 border-t border-stone-200/60 font-mono">
               <div>
                 <span className="text-stone-500 block">Slope Angle</span>
                 <span className="font-bold text-stone-900">{zone.slope}° (&times;{zone.assessment.landslideBreakdown.slopeMultiplier})</span>
@@ -293,12 +293,25 @@ export const ZoneDetailPanel: React.FC<ZoneDetailPanelProps> = ({
                 <span className="text-stone-500 block">Valley Funnel</span>
                 <span className="font-bold text-stone-900">&times;{zone.assessment.floodBreakdown.elevationFunnelMultiplier}</span>
               </div>
+              <div>
+                <span className="text-stone-500 block">River Flow</span>
+                <span className="font-bold text-stone-900">
+                  {zone.assessment.floodBreakdown.riverDischargeM3s != null
+                    ? `${zone.assessment.floodBreakdown.riverDischargeM3s.toLocaleString()} m³/s`
+                    : 'Unavailable'}
+                </span>
+                <span className="block text-stone-500">
+                  {zone.assessment.floodBreakdown.riverFlowRatio != null
+                    ? `Q/Q95 ${zone.assessment.floodBreakdown.riverFlowRatio.toFixed(2)}×`
+                    : 'No flow ratio'}
+                </span>
+              </div>
             </div>
           </div>
 
           <div className="p-3.5 rounded-xl border border-stone-200/80 glass-card">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-bold text-stone-900">XGBoost rainfall-risk proxy</span>
+              <span className="text-xs font-bold text-stone-900">XGBoost rainfall + high-flow proxy</span>
               {floodRiskModel && (
                 <span className="text-xs font-bold text-stone-800">
                   {floodRiskModel.riskPercent.toFixed(1)}% score
@@ -338,10 +351,13 @@ export const ZoneDetailPanel: React.FC<ZoneDetailPanelProps> = ({
               <div>
                 <span className="font-sans font-bold text-stone-900 block mb-0.5">FFI Calculation:</span>
                 <p className="text-[11px] text-stone-700">
-                  (24h &times; 0.68 + Rate &times; 3.6) &times; RiverBuffer &times; Elevation &times; 0.40
+                  (24h &times; 0.68 + Rate &times; 3.6) &times; RiverBuffer &times; Elevation &times; FlowFactor &times; 0.40
                 </p>
                 <p className="text-[10px] text-orange-800 mt-1 font-sans">
-                  = ({zone.assessment.floodBreakdown.accumulation24h} + {zone.assessment.floodBreakdown.intensityFactor}) &times; {zone.assessment.floodBreakdown.riverProximityMultiplier} &times; {zone.assessment.floodBreakdown.elevationFunnelMultiplier} &times; 0.40 = <strong className="text-stone-900">{zone.assessment.floodScore}</strong>
+                  = ({zone.assessment.floodBreakdown.accumulation24h} + {zone.assessment.floodBreakdown.intensityFactor}) &times; {zone.assessment.floodBreakdown.riverProximityMultiplier} &times; {zone.assessment.floodBreakdown.elevationFunnelMultiplier} &times; {zone.assessment.floodBreakdown.riverFlowMultiplier} &times; 0.40 = <strong className="text-stone-900">{zone.assessment.floodScore}</strong>
+                </p>
+                <p className="text-[10px] text-stone-600 mt-1 font-sans">
+                  Flow factor = 1 + 0.5 &times; clamp(Q/Q95, 0, 2); Q95 is a historical high-flow reference, not a bankfull level.
                 </p>
               </div>
               <button
