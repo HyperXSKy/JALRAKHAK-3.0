@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, MapPin, Navigation, ArrowRight, ShieldAlert, CloudRain, AlertCircle } from 'lucide-react';
+import { X, MapPin, Navigation, ArrowRight, ShieldAlert, CloudRain, AlertCircle, Waves } from 'lucide-react';
 import { ZoneWithTelemetry, WeatherRainfallData } from '../types';
 import { RISK_PALETTE } from '../utils/riskEngine';
 import { HLSInundationScreenResponse } from '../services/backend';
@@ -124,17 +124,23 @@ export const CheckAreaModal: React.FC<CheckAreaModalProps> = ({
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-4 gap-2 text-center">
+                    <div className="grid grid-cols-2 gap-2 text-center sm:grid-cols-5">
                       <div className="p-2 bg-white/80 rounded-lg border border-stone-200/70 shadow-2xs">
-                        <span className="text-[9px] uppercase font-bold text-stone-500 block">Rain Rate</span>
+                        <span className="text-[9px] uppercase font-bold text-stone-500 block">Now</span>
                         <span className="font-mono font-bold text-stone-900 text-xs">
                           {userWeather.currentRateMmPerHour} mm/h
                         </span>
                       </div>
                       <div className="p-2 bg-white/80 rounded-lg border border-stone-200/70 shadow-2xs">
-                        <span className="text-[9px] uppercase font-bold text-stone-500 block">24h Total</span>
+                        <span className="text-[9px] uppercase font-bold text-stone-500 block">Past 24h</span>
                         <span className="font-mono font-bold text-stone-900 text-xs">
                           {userWeather.last24hMm} mm
+                        </span>
+                      </div>
+                      <div className="p-2 bg-white/80 rounded-lg border border-stone-200/70 shadow-2xs">
+                        <span className="text-[9px] uppercase font-bold text-stone-500 block">Next 24h</span>
+                        <span className="font-mono font-bold text-stone-900 text-xs">
+                          {userWeather.forecastNext24hMm} mm
                         </span>
                       </div>
                       <div className="p-2 bg-white/80 rounded-lg border border-stone-200/70 shadow-2xs">
@@ -150,6 +156,48 @@ export const CheckAreaModal: React.FC<CheckAreaModalProps> = ({
                         </span>
                       </div>
                     </div>
+
+                    <div className="flex items-center justify-between gap-3 rounded-lg border border-cyan-200/70 bg-cyan-50/70 px-3 py-2.5">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <Waves className="h-4 w-4 shrink-0 text-cyan-700" />
+                        <div className="min-w-0">
+                          <span className="block text-[10px] font-bold text-stone-700">Nearest modeled river flow</span>
+                          <span className="block truncate text-[9px] text-stone-500">
+                            {userWeather.riverDischarge?.source || 'GloFAS river grid'}
+                            {userWeather.riverDischarge?.latitude != null && userWeather.riverDischarge.longitude != null
+                              ? ` · ${userWeather.riverDischarge.latitude.toFixed(2)}, ${userWeather.riverDischarge.longitude.toFixed(2)}`
+                              : ''}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <span className="block font-mono text-xs font-bold text-stone-900">
+                          {userWeather.riverDischarge?.currentM3s != null
+                            ? `${userWeather.riverDischarge.currentM3s.toLocaleString()} m³/s`
+                            : 'Unavailable'}
+                        </span>
+                        <span className="block text-[9px] text-stone-500">
+                          {userWeather.riverDischarge?.currentDate
+                            ? `Daily · ${userWeather.riverDischarge.currentDate}`
+                            : 'Daily discharge · not river stage'}
+                        </span>
+                      </div>
+                    </div>
+                    {userWeather.riverDischarge?.highFlowThresholdM3s != null && (
+                      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-1 text-[10px] text-stone-600">
+                        <span>
+                          Next day: {userWeather.riverDischarge.nextDayM3s != null
+                            ? `${userWeather.riverDischarge.nextDayM3s.toLocaleString()} m³/s`
+                            : '--'}
+                        </span>
+                        <span>
+                          Q/Q95: {userWeather.riverDischarge.highFlowRatio != null
+                            ? `${userWeather.riverDischarge.highFlowRatio.toFixed(2)}×`
+                            : '--'}
+                          {' · '}P95 {userWeather.riverDischarge.highFlowThresholdM3s.toLocaleString()} m³/s
+                        </span>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <p className="text-stone-500 text-[11px]">Local weather details are unavailable right now.</p>
@@ -183,19 +231,23 @@ export const CheckAreaModal: React.FC<CheckAreaModalProps> = ({
                 )}
               </div>
 
-              {floodRiskModel && (
-                <div className="p-3.5 glass-card border border-stone-200/80 rounded-xl space-y-1.5">
+              <div className="p-3.5 glass-card border border-stone-200/80 rounded-xl space-y-1.5">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs font-bold text-stone-800">XGBoost rainfall-risk proxy</span>
-                    <span className="text-xs font-bold text-stone-900">
-                      {floodRiskModel.riskPercent.toFixed(1)}% score
-                    </span>
+                    <span className="text-xs font-bold text-stone-800">XGBoost flood-risk score</span>
+                    {floodRiskModel ? (
+                      <span className="text-xs font-bold text-stone-900">
+                        {floodRiskModel.riskPercent.toFixed(1)}%
+                      </span>
+                    ) : (
+                      <span className="text-xs font-bold text-stone-500">Not available</span>
+                    )}
                   </div>
                   <p className="text-[11px] text-stone-600 leading-relaxed">
-                    Based on the {('nearestZoneName' in floodRiskModel && floodRiskModel.nearestZoneName) || nearestZone?.name || 'nearest monitored area'} profile. Trained on rainfall-threshold labels, not observed floods; this is not a calibrated flood probability.
+                    {floodRiskModel
+                      ? `${floodRiskModel.scoreMeaning} Area: ${('nearestZoneName' in floodRiskModel && floodRiskModel.nearestZoneName) || nearestZone?.name || 'nearest monitored area'}.`
+                      : 'Score not available. Please wait a few seconds and try again.'}
                   </p>
                 </div>
-              )}
 
               {/* Nearest Zone Card */}
               {nearestZone && (

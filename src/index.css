@@ -5,35 +5,50 @@
 }
 
 body {
-  color: #193c38;
-  background: #f3f7f3;
+  color: #193653;
+  background: #f2f6fb;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+a,
+input,
+select,
+textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+
+:focus-visible {
+  outline: 2px solid #0891b2;
+  outline-offset: 2px;
 }
 
 /* Soft river-glass surfaces */
 .glass-dock {
-  background: rgba(248, 252, 249, 0.94);
+  background: rgba(248, 251, 255, 0.95);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border-color: rgba(163, 190, 178, 0.55);
-  box-shadow: 0 4px 18px rgba(25, 60, 56, 0.06);
+  border-color: rgba(165, 188, 215, 0.6);
+  box-shadow: 0 4px 18px rgba(29, 67, 105, 0.07);
 }
 
 .glass-card {
   background: rgba(255, 255, 255, 0.88);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(163, 190, 178, 0.5);
-  border-radius: 1.5rem;
-  box-shadow: 0 3px 12px rgba(25, 60, 56, 0.045);
+  border: 1px solid rgba(165, 188, 215, 0.55);
+  border-radius: 0.75rem;
+  box-shadow: 0 3px 12px rgba(29, 67, 105, 0.05);
 }
 
 .glass-card-interactive {
-  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: background-color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
 }
 .glass-card-interactive:hover {
   background: rgba(255, 255, 255, 0.95);
-  border-color: rgba(45, 126, 105, 0.4);
-  box-shadow: 0 9px 22px rgba(25, 60, 56, 0.1);
+  border-color: rgba(54, 117, 180, 0.45);
+  box-shadow: 0 9px 22px rgba(29, 67, 105, 0.12);
   transform: translateY(-2px);
 }
 
@@ -41,14 +56,14 @@ body {
   background: rgba(255, 255, 255, 0.9);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(163, 190, 178, 0.55);
+  border: 1px solid rgba(165, 188, 215, 0.6);
   border-radius: 999px;
-  box-shadow: 0 2px 7px rgba(25, 60, 56, 0.05);
+  box-shadow: 0 2px 7px rgba(29, 67, 105, 0.06);
 }
 
 .tactile-btn {
   border-radius: 999px;
-  box-shadow: 0 2px 6px rgba(25, 60, 56, 0.08);
+  box-shadow: 0 2px 6px rgba(29, 67, 105, 0.09);
   transition: all 0.15s ease-in-out;
 }
 .tactile-btn:active {
@@ -61,26 +76,26 @@ body {
 }
 
 .glass-modal {
-  background: rgba(250, 253, 250, 0.97);
+  background: rgba(250, 252, 255, 0.98);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(163, 190, 178, 0.6);
-  border-radius: 1.75rem;
-  box-shadow: 0 20px 40px -8px rgba(25, 60, 56, 0.18);
+  border: 1px solid rgba(165, 188, 215, 0.65);
+  border-radius: 1rem;
+  box-shadow: 0 20px 40px -8px rgba(29, 67, 105, 0.2);
 }
 
 /* Leaflet Container & Popup Styling */
 .leaflet-container {
   font-family: inherit;
-  background-color: #e8f0eb;
+  background-color: #e8f0f8;
 }
 
 .custom-leaflet-popup .leaflet-popup-content-wrapper {
   background: rgba(255, 255, 255, 0.96);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(163, 190, 178, 0.7);
-  box-shadow: 0 12px 28px -6px rgba(25, 60, 56, 0.18);
+  border: 1px solid rgba(165, 188, 215, 0.75);
+  box-shadow: 0 12px 28px -6px rgba(29, 67, 105, 0.2);
   border-radius: 20px;
   padding: 0;
   overflow: hidden;
@@ -93,7 +108,7 @@ body {
 
 .custom-leaflet-popup .leaflet-popup-tip {
   background: rgba(255, 255, 255, 0.96);
-  border: 1px solid rgba(163, 190, 178, 0.7);
+  border: 1px solid rgba(165, 188, 215, 0.75);
 }
 
 /* Custom leaflet divIcon reset */
@@ -116,4 +131,15 @@ body {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: #a8a29e;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

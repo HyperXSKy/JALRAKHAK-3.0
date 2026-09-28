@@ -43,6 +43,20 @@ export interface WeatherRainfallData {
   stationElevationM?: number;
   generationTimeMs?: number;
   liveIsoTimestamp?: string;
+  riverDischarge?: RiverDischargeTelemetry | null;
+}
+
+export interface RiverDischargeTelemetry {
+  source: string;
+  latitude: number | null;
+  longitude: number | null;
+  currentDate: string | null;
+  currentM3s: number | null;
+  nextDayM3s?: number | null;
+  peakM3s: number | null;
+  highFlowThresholdM3s?: number | null;
+  highFlowRatio?: number | null;
+  daily: { date: string | null; dischargeM3s: number | null }[];
 }
 
 export interface FormulaBreakdownLandslide {
@@ -58,6 +72,10 @@ export interface FormulaBreakdownFlood {
   intensityFactor: number;
   riverProximityMultiplier: number;
   elevationFunnelMultiplier: number;
+  riverFlowMultiplier: number;
+  riverFlowRatio: number | null;
+  riverDischargeM3s: number | null;
+  riverHighFlowThresholdM3s: number | null;
   rawScore: number;
 }
 

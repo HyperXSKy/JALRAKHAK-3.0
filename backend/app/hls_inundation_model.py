@@ -94,5 +94,64 @@ class HLSInundationModel:
             "operationalWarning": False,
         }
 
+    def predict_grid(self, weather: dict[str, Any]) -> dict[str, Any]:
+        self.load()
+        now = datetime.now(timezone.utc)
+        day_radians = 2 * math.pi * now.timetuple().tm_yday / 366.0
+        rain_24h = max(0.0, float(weather.get("last24hMm") or 0))
+        rain_72h = max(0.0, float(weather.get("last72hMm") or 0))
+        rain_7d = max(0.0, float(weather.get("last168hMm") or 0))
+        humidity = float(weather.get("humidity24hPercent") or weather.get("humidityPercent") or 75)
+        feature_names = self.metadata["features"]
+        rows = []
+        for cell in self.cells:
+            values = {
+                "latitude": float(cell["latitude"]),
+                "longitude": float(cell["longitude"]),
+                "elevation_m": float(cell["elevationM"]),
+                "slope_degrees": float(cell["slopeDegrees"]),
+                "rain_24h_mm": rain_24h,
+                "rain_72h_mm": rain_72h,
+                "rain_7d_mm": rain_7d,
+                "humidity_24h_percent": humidity,
+                "day_of_year_sin": math.sin(day_radians),
+                "day_of_year_cos": math.cos(day_radians),
+            }
+            rows.append([values[name] for name in feature_names])
+
+        matrix = np.asarray(rows, dtype=np.float32)
+        predictions = np.clip(
+            self.model.predict(xgb.DMatrix(matrix, feature_names=feature_names)),
+            0.0,
+            1.0,
+        )
+        latitudes = sorted({float(cell["latitude"]) for cell in self.cells})
+        longitudes = sorted({float(cell["longitude"]) for cell in self.cells})
+        latitude_steps = [b - a for a, b in zip(latitudes, latitudes[1:]) if b > a]
+        longitude_steps = [b - a for a, b in zip(longitudes, longitudes[1:]) if b > a]
+        return {
+            "cells": [
+                {
+                    "latitude": float(cell["latitude"]),
+                    "longitude": float(cell["longitude"]),
+                    "estimatedHlsFraction": round(float(predictions[index]), 4),
+                }
+                for index, cell in enumerate(self.cells)
+            ],
+            "cellSizeLatitudeDegrees": min(latitude_steps) if latitude_steps else 0,
+            "cellSizeLongitudeDegrees": min(longitude_steps) if longitude_steps else 0,
+            "coverage": {
+                "south": min(latitudes),
+                "north": max(latitudes),
+                "west": min(longitudes),
+                "east": max(longitudes),
+            },
+            "highFractionCutoff": float(self.metadata["highFractionCutoff"]),
+            "target": self.metadata["target"],
+            "targetCaveat": self.metadata["targetCaveat"],
+            "source": "Local HLS spatial-label model",
+            "operationalWarning": False,
+        }
+
 
 HLS_INUNDATION_MODEL = HLSInundationModel()

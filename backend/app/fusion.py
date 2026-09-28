@@ -42,6 +42,9 @@ async def fuse_zone(zone: dict, scenario: str = "LIVE") -> dict[str, Any]:
     if live:
         tasks = {
             "obs": fetch_model_forecast(lat, lng, None),
+            "gfs": fetch_model_forecast(lat, lng, "gfs_seamless"),
+            "ecmwf": fetch_model_forecast(lat, lng, "ecmwf_ifs025"),
+            "icon": fetch_model_forecast(lat, lng, "icon_seamless"),
             "glofas": fetch_glofas_discharge(lat, lng),
         }
         keys = list(tasks.keys())
@@ -111,7 +114,7 @@ async def fuse_zone(zone: dict, scenario: str = "LIVE") -> dict[str, Any]:
     mode_obs = "live" if obs.get("isLive") else ("simulated" if scenario not in ("LIVE",) else "unavailable")
     sat_mode = "live_proxy" if live and obs.get("isLive") else ("hindcast" if scenario == "HINDCAST" else ("simulated" if not live else "unavailable"))
     radar_mode = sat_mode
-    nwp_mode = "live" if nwp_gfs or nwp_ecmwf else mode_obs
+    nwp_mode = "live" if any((nwp_gfs, nwp_ecmwf, nwp_icon)) else mode_obs
 
     sources = [
         _source(
@@ -192,7 +195,9 @@ async def fuse_zone(zone: dict, scenario: str = "LIVE") -> dict[str, Any]:
         "generationTimeMs": obs.get("generationTimeMs"),
         "liveIsoTimestamp": obs.get("liveIsoTimestamp"),
         "blended24hMm": blended_24,
+        "riverDischarge": glofas,
     }
+    FLOOD_MODEL.add_river_context(zone, weather)
     flood_risk = FLOOD_MODEL.predict(zone, weather)
 
     nowcast = {

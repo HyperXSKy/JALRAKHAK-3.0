@@ -24,6 +24,8 @@ FLOOD_FEATURE_NAMES = [
     "soil_saturation_percent",
     "impervious_fraction",
     "catchment_area_km2",
+    "river_discharge_m3s",
+    "river_discharge_p95_ratio",
 ]
 
 
@@ -41,6 +43,12 @@ def flood_features(zone: dict, weather: dict) -> np.ndarray:
             float(zone.get("soilSaturationInitial") or 0),
             float(zone.get("imperviousFraction") or 0),
             float(zone.get("catchmentAreaKm2") or 0),
+            float((weather.get("riverDischarge") or {}).get("currentM3s"))
+            if (weather.get("riverDischarge") or {}).get("currentM3s") is not None
+            else np.nan,
+            float((weather.get("riverDischarge") or {}).get("highFlowRatio"))
+            if (weather.get("riverDischarge") or {}).get("highFlowRatio") is not None
+            else np.nan,
         ]],
         dtype=np.float32,
     )
@@ -63,10 +71,35 @@ class FloodRiskXGBoost:
         if FLOOD_METADATA_PATH.exists():
             self.metadata = json.loads(FLOOD_METADATA_PATH.read_text(encoding="utf-8"))
 
-    def predict(self, zone: dict, weather: dict) -> dict[str, Any]:
-        if self.model is None:
+    def add_river_context(self, zone: dict, weather: dict) -> None:
+        if self.model is None or "riverFlowP95M3sByZone" not in self.metadata:
             self.load()
-        features = xgb.DMatrix(flood_features(zone, weather))
+        thresholds = self.metadata.get("riverFlowP95M3sByZone", {})
+        threshold = thresholds.get(zone.get("id"))
+        telemetry = weather.get("riverDischarge") or {
+            "source": "GloFAS via Open-Meteo Flood API",
+            "latitude": None,
+            "longitude": None,
+            "currentDate": None,
+            "currentM3s": None,
+            "nextDayM3s": None,
+            "peakM3s": None,
+            "daily": [],
+        }
+        current_flow = telemetry.get("currentM3s")
+        telemetry["highFlowThresholdM3s"] = threshold
+        telemetry["highFlowRatio"] = (
+            float(current_flow) / float(threshold)
+            if current_flow is not None and threshold is not None and float(threshold) > 0
+            else None
+        )
+        weather["riverDischarge"] = telemetry
+
+    def predict(self, zone: dict, weather: dict) -> dict[str, Any]:
+        feature_values = flood_features(zone, weather)
+        if self.model is None or self.model.num_features() != feature_values.shape[1]:
+            self.load()
+        features = xgb.DMatrix(feature_values)
         probability = float(self.model.predict(features)[0])
         holdout = self.metadata.get("chronologicalHoldout", {})
         decision_threshold = float(holdout.get("decisionThreshold", 0.35))
@@ -77,7 +110,7 @@ class FloodRiskXGBoost:
             "riskPercent": round(probability * 100, 1),
             "level": "Severe" if probability >= 0.95 else "High" if probability >= decision_threshold else "Moderate" if probability >= moderate_threshold else "Low",
             "decisionThreshold": round(decision_threshold, 3),
-            "scoreMeaning": "Score for the rainfall-triggered flood-risk proxy label; not a calibrated probability of an observed flood event.",
+            "scoreMeaning": "Estimated from historical rainfall and GloFAS river-flow patterns. It does not confirm flooding or river overflow.",
             "observedEventProbability": False,
             "model": self.metadata,
         }

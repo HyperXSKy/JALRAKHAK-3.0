@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { MONITORING_ZONES } from './data/zones';
 import { ZoneWithTelemetry, EarlyWarningAlert, RiskLevel, WeatherRainfallData } from './types';
 import { fetchZoneWeather, fetchLivePointWeather, SimulationScenario } from './services/openMeteo';
@@ -14,11 +14,13 @@ import { SidebarZoneList } from './components/SidebarZoneList';
 import { InteractiveMap } from './components/InteractiveMap';
 import { ZoneDetailPanel } from './components/ZoneDetailPanel';
 import { HowItWorksModal } from './components/HowItWorksModal';
-import { SmsPushModal } from './components/SmsPushModal';
 import { CheckAreaModal } from './components/CheckAreaModal';
 import { AlertsDrawerModal } from './components/AlertsDrawerModal';
 import { LandingPage } from './components/LandingPage';
 import { Map, ListFilter, Activity, RefreshCw } from 'lucide-react';
+import { DEFAULT_SANDBOX_INPUTS, SandboxInputs, applySandboxInputs } from './services/sandbox';
+import { SimulationWorkspace } from './components/SimulationWorkspace';
+import { AlertsWorkspace } from './components/AlertsWorkspace';
 
 async function fetchNetworkLocation(): Promise<{ lat: number; lng: number } | null> {
   const controller = new AbortController();
@@ -50,11 +52,13 @@ function fetchBrowserFallbackZones(scenario: SimulationScenario): Promise<ZoneWi
   const existingRequest = browserFallbackRequests.get(scenario);
   if (existingRequest) return existingRequest;
 
-  const request = Promise.all(
+  const request = Promise.allSettled(
     MONITORING_ZONES.map(async (zone) => {
       const weather = await fetchZoneWeather(zone, scenario);
       return { ...zone, weather, assessment: calculateZoneRisk(zone, weather) };
     })
+  ).then((results) =>
+    results.flatMap((result) => (result.status === 'fulfilled' ? [result.value] : []))
   );
   browserFallbackRequests.set(scenario, request);
   const clearRequest = () => {
@@ -67,11 +71,14 @@ function fetchBrowserFallbackZones(scenario: SimulationScenario): Promise<ZoneWi
 }
 
 export default function App() {
-  const [currentView, setCurrentView] = useState<'LANDING' | 'DASHBOARD'>('LANDING');
+  const [currentView, setCurrentView] = useState<'LANDING' | 'DASHBOARD' | 'SIMULATION' | 'ALERTS'>('LANDING');
   const [zones, setZones] = useState<ZoneWithTelemetry[]>([]);
   const [selectedZone, setSelectedZone] = useState<ZoneWithTelemetry | null>(null);
   const [alerts, setAlerts] = useState<EarlyWarningAlert[]>([]);
+  const acknowledgedAlertIdsRef = useRef<Set<string>>(new Set());
   const [scenario, setScenario] = useState<SimulationScenario>('LIVE');
+  const [sandboxInputs, setSandboxInputs] = useState<SandboxInputs>(DEFAULT_SANDBOX_INPUTS);
+  const [simulationZoneId, setSimulationZoneId] = useState('');
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [isLiveApi, setIsLiveApi] = useState<boolean>(true);
@@ -82,7 +89,6 @@ export default function App() {
   const [filterHazard, setFilterHazard] = useState<'ALL' | 'HIGH_SEVERE' | 'LANDSLIDE' | 'FLOOD'>('ALL');
 
   const [isHowItWorksOpen, setIsHowItWorksOpen] = useState(false);
-  const [isSmsOpen, setIsSmsOpen] = useState(false);
   const [isAlertsDrawerOpen, setIsAlertsDrawerOpen] = useState(false);
 
   const [isCheckAreaOpen, setIsCheckAreaOpen] = useState(false);
@@ -97,6 +103,8 @@ export default function App() {
   const [geoError, setGeoError] = useState<string | null>(null);
 
   const [mobileTab, setMobileTab] = useState<'MAP' | 'LIST' | 'DETAIL'>('MAP');
+  const [isSectorListVisible, setIsSectorListVisible] = useState(true);
+  const [isZoneDetailsVisible, setIsZoneDetailsVisible] = useState(true);
 
   const loadLocationWeatherAndModel = (lat: number, lng: number, label: string) => {
     setIsLoadingUserWeather(true);
@@ -131,7 +139,7 @@ export default function App() {
       const backendPayload = await fetchBackendDashboard(scenarioMode);
       setIsLiveApi(scenarioMode === 'LIVE' && backendPayload.zones.some((zone) => zone.weather.isLive));
       setZones(backendPayload.zones);
-      setAlerts(backendPayload.alerts);
+      setAlerts(backendPayload.alerts.filter((alert) => !acknowledgedAlertIdsRef.current.has(alert.id)));
       setLastSyncTime(new Date(backendPayload.generatedAt).toLocaleTimeString());
       setCountdownSeconds(60);
       setSelectedZone((prev) => {
@@ -162,7 +170,7 @@ export default function App() {
       results.sort((a, b) => b.assessment.compositeScore - a.assessment.compositeScore);
 
       setZones(results);
-      setAlerts(generatedAlerts);
+      setAlerts(generatedAlerts.filter((alert) => !acknowledgedAlertIdsRef.current.has(alert.id)));
       setLastSyncTime(new Date().toLocaleTimeString());
       setCountdownSeconds(60);
 
@@ -325,26 +333,42 @@ export default function App() {
     const found = zones.find((z) => z.id === zoneId);
     if (found) {
       setSelectedZone(found);
+      setCurrentView('DASHBOARD');
       setMobileTab('DETAIL');
     }
   };
 
   const handleAcknowledgeAlert = (alertId: string) => {
+    acknowledgedAlertIdsRef.current.add(alertId);
     setAlerts((prev) => prev.filter((a) => a.id !== alertId));
   };
 
+  const simulationTarget = zones.find((zone) => zone.id === simulationZoneId) || selectedZone || zones[0] || null;
+  const simulationZones = zones.map((zone) =>
+    simulationTarget?.id === zone.id ? applySandboxInputs(zone, sandboxInputs) : zone
+  );
+  const simulatedSelectedZone = simulationTarget
+    ? simulationZones.find((zone) => zone.id === simulationTarget.id) || null
+    : null;
+  const generatedSimulationAlert = simulatedSelectedZone
+    ? generateZoneAlert(simulatedSelectedZone, simulatedSelectedZone.assessment)
+    : null;
+  const simulationAlerts = generatedSimulationAlert
+    ? [{ ...generatedSimulationAlert, id: `simulation-${simulatedSelectedZone?.id}`, timestamp: 'Simulation preview' }]
+    : [];
+
   return (
-    <div className="flex flex-col h-screen max-h-screen w-full overflow-hidden bg-[#f3f7f3] text-[#193c38] font-sans selection:bg-emerald-100 selection:text-emerald-950">
+    <div className="flex flex-col h-screen max-h-screen w-full overflow-hidden bg-[#f2f6fb] text-[#193653] font-sans selection:bg-sky-100 selection:text-sky-950">
       {/* Top Header */}
       <TopNav
         currentView={currentView}
         onViewChange={setCurrentView}
         alertCount={alerts.length}
+        simulationAlertCount={simulationAlerts.length}
         onOpenAlerts={() => setIsAlertsDrawerOpen(true)}
         onCheckMyArea={handleCheckMyArea}
         isLocating={isLocating}
         onOpenHowItWorks={() => setIsHowItWorksOpen(true)}
-        onOpenSmsSimulator={() => setIsSmsOpen(true)}
         simulationScenario={scenario}
         onScenarioChange={handleScenarioChange}
         onRefreshData={() => loadData(scenario)}
@@ -368,7 +392,7 @@ export default function App() {
               setMobileTab('DETAIL');
             }}
             onCheckMyArea={handleCheckMyArea}
-            onOpenSmsSimulator={() => setIsSmsOpen(true)}
+            onOpenAlertDelivery={() => setCurrentView('ALERTS')}
             onOpenHowItWorks={() => setIsHowItWorksOpen(true)}
             onOpenAlerts={() => setIsAlertsDrawerOpen(true)}
             isLiveApi={isLiveApi}
@@ -377,13 +401,37 @@ export default function App() {
             isLoading={isLoading}
           />
         </div>
+      ) : isLoading ? (
+        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
+          <RefreshCw className="mb-3 h-8 w-8 animate-spin text-orange-600" />
+          <h2 className="text-base font-bold text-stone-900">Initializing Hydrological Telemetry...</h2>
+          <p className="mt-1 max-w-sm text-xs text-stone-700">Fetching rainfall and watershed data for the selected view.</p>
+        </div>
+      ) : currentView === 'SIMULATION' ? (
+        <SimulationWorkspace
+          zones={simulationZones}
+          selectedZone={simulatedSelectedZone}
+          onSelectZone={(zone) => {
+            setSimulationZoneId(zone.id);
+            setSelectedZone(zones.find((item) => item.id === zone.id) || zone);
+          }}
+          inputs={sandboxInputs}
+          onInputsChange={setSandboxInputs}
+          onReset={() => setSandboxInputs(DEFAULT_SANDBOX_INPUTS)}
+        />
+      ) : currentView === 'ALERTS' ? (
+        <AlertsWorkspace
+          alerts={alerts}
+          simulationAlerts={simulationAlerts}
+          onOpenSimulation={() => setCurrentView('SIMULATION')}
+        />
       ) : (
         <>
           {/* Threshold Violations Alert Banner */}
           <AlertBanner
             alerts={alerts}
             onSelectZoneById={handleSelectZoneById}
-            onOpenSmsSimulator={() => setIsSmsOpen(true)}
+            onOpenAlertDelivery={() => setCurrentView('ALERTS')}
           />
 
           {/* Main Content Area */}
@@ -437,12 +485,12 @@ export default function App() {
               <div className="flex-1 flex flex-col lg:flex-row overflow-hidden relative min-h-0">
                 {/* Left Column: Sectors List */}
                 <div
-                  className={`h-full ${mobileTab === 'LIST' ? 'flex flex-1 w-full min-h-0' : 'hidden lg:flex min-h-0'
-                    }`}
+                  className={`h-full ${mobileTab === 'LIST' ? 'flex flex-1 w-full min-h-0' : 'hidden'} ${isSectorListVisible ? 'lg:flex lg:flex-none lg:w-80 xl:w-96' : 'lg:hidden'}`}
                 >
                   <SidebarZoneList
                     zones={zones}
                     selectedZone={selectedZone}
+                    onCollapse={() => setIsSectorListVisible(false)}
                     onSelectZone={(z) => {
                       setSelectedZone(z);
                       setMobileTab('DETAIL');
@@ -452,8 +500,7 @@ export default function App() {
 
                 {/* Center Column: Interactive Hero Map */}
                 <main
-                  className={`h-full flex-1 relative min-h-0 ${mobileTab === 'MAP' ? 'flex flex-1 w-full min-h-[400px]' : 'hidden lg:flex'
-                    }`}
+                  className={`h-full flex-1 relative min-h-0 ${mobileTab === 'LIST' ? 'hidden' : 'flex w-full min-h-[400px]'} lg:flex lg:min-h-0`}
                 >
                   <InteractiveMap
                     zones={zones}
@@ -468,19 +515,29 @@ export default function App() {
                     onGoHome={() => setCurrentView('LANDING')}
                     onScanLocation={handleCheckMyArea}
                     isLocating={isLocating}
+                    isSectorListVisible={isSectorListVisible}
+                    isZoneDetailsVisible={isZoneDetailsVisible}
+                    onToggleSectorList={() => setIsSectorListVisible((visible) => !visible)}
+                    onToggleZoneDetails={() => {
+                      const visible = !isZoneDetailsVisible;
+                      setIsZoneDetailsVisible(visible);
+                      setMobileTab(visible ? 'DETAIL' : 'MAP');
+                    }}
                   />
                 </main>
 
                 {/* Right Column: Selected Sector Deep Telemetry & Recharts */}
                 <div
-                  className={`h-full ${mobileTab === 'DETAIL' ? 'flex flex-1 w-full' : 'hidden lg:flex'
-                    }`}
+                  className={`h-full ${mobileTab === 'DETAIL' && isZoneDetailsVisible ? 'absolute inset-x-0 bottom-0 z-20 h-[68%] w-full shadow-2xl md:inset-y-0 md:left-auto md:right-0 md:h-full md:w-[min(45vw,24rem)]' : 'hidden'} ${isZoneDetailsVisible ? 'lg:relative lg:inset-auto lg:z-auto lg:flex lg:h-full lg:w-auto lg:flex-none lg:shadow-none' : 'lg:hidden'}`}
                 >
                   {selectedZone ? (
                     <ZoneDetailPanel
                       zone={selectedZone}
-                      onClose={() => setSelectedZone(null)}
-                      onOpenSmsSimulator={() => setIsSmsOpen(true)}
+                      onClose={() => {
+                        setIsZoneDetailsVisible(false);
+                        setMobileTab('MAP');
+                      }}
+                      onOpenAlertDelivery={() => setCurrentView('ALERTS')}
                       onOpenHowItWorks={() => setIsHowItWorksOpen(true)}
                     />
                   ) : (
@@ -504,13 +561,13 @@ export default function App() {
       <HowItWorksModal
         isOpen={isHowItWorksOpen}
         onClose={() => setIsHowItWorksOpen(false)}
-      />
-
-      <SmsPushModal
-        isOpen={isSmsOpen}
-        onClose={() => setIsSmsOpen(false)}
-        zones={zones}
-        selectedZone={selectedZone}
+        inputs={sandboxInputs}
+        onInputsChange={setSandboxInputs}
+        riverFlowThresholdM3s={
+          simulationTarget?.weather.riverDischarge?.highFlowThresholdM3s
+          ?? selectedZone?.weather.riverDischarge?.highFlowThresholdM3s
+          ?? null
+        }
       />
 
       <CheckAreaModal
@@ -540,6 +597,7 @@ export default function App() {
         isOpen={isAlertsDrawerOpen}
         onClose={() => setIsAlertsDrawerOpen(false)}
         alerts={alerts}
+        simulationAlerts={simulationAlerts}
         onSelectZoneById={handleSelectZoneById}
         onAcknowledgeAlert={handleAcknowledgeAlert}
       />

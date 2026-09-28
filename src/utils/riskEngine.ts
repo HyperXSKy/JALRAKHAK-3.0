@@ -106,15 +106,25 @@ export function calculateZoneRisk(zone: Zone, weather: WeatherRainfallData): Ris
   const riverProximityMultiplier = Number(
     Math.max(0.6, 2.4 - riverProximityClamped * 0.55).toFixed(2)
   );
-  // Elevation funnel proxy: lower elevation valley floors receive upstream watershed discharge
+  // Lower valley floors receive a stronger elevation multiplier.
   const elevationFactor = Number(
     Math.max(0.7, 2.0 - (Math.min(zone.elevation, 1500) / 1200) * 0.85).toFixed(2)
   );
+  const riverDischarge = weather.riverDischarge;
+  const riverFlowRatio = riverDischarge?.highFlowRatio ?? (
+    riverDischarge?.currentM3s != null && riverDischarge.highFlowThresholdM3s != null && riverDischarge.highFlowThresholdM3s > 0
+      ? riverDischarge.currentM3s / riverDischarge.highFlowThresholdM3s
+      : null
+  );
+  const riverFlowMultiplier = riverFlowRatio == null
+    ? 1
+    : Number((1 + 0.5 * Math.min(2, Math.max(0, riverFlowRatio))).toFixed(2));
 
   const rawFlood =
     (floodAccumulation24 + floodIntensity) *
     riverProximityMultiplier *
     elevationFactor *
+    riverFlowMultiplier *
     0.40;
   const floodScore = Math.min(100, Math.max(0, Math.round(rawFlood)));
   const floodLevel = getRiskLevel(floodScore);
@@ -159,6 +169,11 @@ export function calculateZoneRisk(zone: Zone, weather: WeatherRainfallData): Ris
     thresholdsTriggered.push(`River Buffer (${zone.riverProximityKm}km) Inundation`);
   }
 
+  if (riverFlowRatio != null && riverFlowRatio >= 1) {
+    activeAdvisories.push(`GloFAS discharge reached ${riverFlowRatio.toFixed(1)}x the local high-flow reference`);
+    thresholdsTriggered.push('Daily river discharge >= local historical 95th percentile');
+  }
+
   if (activeAdvisories.length === 0) {
     activeAdvisories.push('Atmospheric conditions stable; catchment drainage within capacity');
   }
@@ -191,6 +206,10 @@ export function calculateZoneRisk(zone: Zone, weather: WeatherRainfallData): Ris
       intensityFactor: Number(floodIntensity.toFixed(1)),
       riverProximityMultiplier,
       elevationFunnelMultiplier: elevationFactor,
+      riverFlowMultiplier,
+      riverFlowRatio: riverFlowRatio == null ? null : Number(riverFlowRatio.toFixed(2)),
+      riverDischargeM3s: riverDischarge?.currentM3s ?? null,
+      riverHighFlowThresholdM3s: riverDischarge?.highFlowThresholdM3s ?? null,
       rawScore: Number(rawFlood.toFixed(1)),
     },
     activeAdvisories,

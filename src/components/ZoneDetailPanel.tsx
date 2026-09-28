@@ -3,11 +3,16 @@ import { ZoneWithTelemetry } from '../types';
 import { RISK_PALETTE } from '../utils/riskEngine';
 import {
   CloudRain,
+  CloudSun,
+  CloudDrizzle,
+  Droplets,
+  History,
   Mountain,
   Waves,
   ShieldAlert,
   Calendar,
-  Clock,
+  Thermometer,
+  Wind,
   Compass,
   Building2,
   Users,
@@ -17,6 +22,7 @@ import {
   ChevronDown,
   Info,
   Maximize2,
+  PanelRightClose,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -27,24 +33,22 @@ import {
   Tooltip,
   CartesianGrid,
   ReferenceLine,
-  LineChart,
-  Line,
 } from 'recharts';
 
 interface ZoneDetailPanelProps {
   zone: ZoneWithTelemetry;
-  onOpenSmsSimulator: () => void;
+  onOpenAlertDelivery: () => void;
   onOpenHowItWorks: () => void;
   onClose?: () => void;
 }
 
 export const ZoneDetailPanel: React.FC<ZoneDetailPanelProps> = ({
   zone,
-  onOpenSmsSimulator,
+  onOpenAlertDelivery,
   onOpenHowItWorks,
   onClose,
 }) => {
-  const [chartView, setChartView] = useState<'DAILY' | 'HOURLY'>('DAILY');
+  const [precipitationView, setPrecipitationView] = useState<'HISTORY' | 'NOW' | 'FORECAST'>('NOW');
   const [showFormulaBreakdown, setShowFormulaBreakdown] = useState(false);
 
   const palette = RISK_PALETTE[zone.assessment.overallLevel];
@@ -52,17 +56,13 @@ export const ZoneDetailPanel: React.FC<ZoneDetailPanelProps> = ({
     zone.assessment.overallLevel === 'High' || zone.assessment.overallLevel === 'Severe';
   const floodRiskModel = zone.fusion?.floodRiskModel;
 
-  const dailyData = zone.weather.dailyHistory.map((item) => ({
+  const historyData = zone.weather.dailyHistory.filter((item) => !item.isForecast).map((item) => ({
     name: item.date,
     rainfall: item.rainfallMm,
-    forecast: item.isForecast,
   }));
-
-  const hourlyData = zone.weather.hourlyForecast.slice(0, 16).map((item) => ({
-    name: item.time,
-    rate: item.precipitationMm,
-    prob: item.probability,
-  }));
+  const forecastDays = zone.weather.dailyHistory.filter((item) => item.isForecast).slice(0, 5);
+  const hourlyForecast = zone.weather.hourlyForecast.slice(0, 8);
+  const historyTotal = historyData.reduce((total, item) => total + item.rainfall, 0);
 
   return (
     <div
@@ -85,11 +85,14 @@ export const ZoneDetailPanel: React.FC<ZoneDetailPanelProps> = ({
             </span>
             {onClose && (
               <button
+                type="button"
                 onClick={onClose}
-                className="tactile-btn p-1 rounded-lg text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition cursor-pointer"
-                title="Close Panel"
+                aria-label="Hide area details"
+                className="tactile-btn flex h-8 items-center gap-1 rounded-lg border border-stone-200 bg-white px-2 text-[10px] font-semibold text-stone-600 hover:bg-stone-100 transition cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-700"
+                title="Hide area details"
               >
-                <ChevronDown className="w-4 h-4 rotate-90" />
+                <PanelRightClose className="h-3.5 w-3.5" />
+                <span>Hide</span>
               </button>
             )}
           </div>
@@ -123,97 +126,180 @@ export const ZoneDetailPanel: React.FC<ZoneDetailPanelProps> = ({
       </div>
 
       <div className="p-4 space-y-4 flex-1">
-        {/* Live Rainfall Telemetry Cards */}
-        <section>
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-stone-700 flex items-center gap-1.5">
-              <CloudRain className="w-4 h-4 text-orange-600" />
-              Precipitation Telemetry
-            </span>
-            <span className="text-[11px] text-stone-500 font-mono">
-              Updated {zone.weather.lastUpdated}
-            </span>
+        <section aria-label="Key model scores">
+          <div className="mb-2 flex items-end justify-between gap-2">
+            <h3 className="text-xs font-bold text-stone-900">Key risk scores</h3>
+            <span className="text-[10px] text-stone-500">Higher means greater estimated risk</span>
           </div>
-
-          <div className="grid grid-cols-3 gap-2">
-            <div className="p-2.5 rounded-xl border border-stone-200/80 glass-card">
-              <span className="text-[10px] uppercase font-bold text-stone-500 block">
-                Current Rate
-              </span>
-              <span className="text-base font-bold text-stone-900 font-mono">
-                {zone.weather.currentRateMmPerHour.toFixed(1)}
-              </span>
-              <span className="text-[10px] text-stone-500 ml-0.5">mm/h</span>
+          <div className="grid grid-cols-3 gap-1.5">
+            <div title="Landslide Susceptibility Index, scored from 0 to 100" className="min-w-0 rounded-lg border border-amber-200 bg-amber-50/70 p-2">
+              <span className="block truncate text-[10px] font-semibold text-stone-700">Landslide · LSI</span>
+              <strong className="mt-1 block font-mono text-lg leading-none text-stone-950">{zone.assessment.landslideScore}<span className="text-[10px] text-stone-500">/100</span></strong>
+              <div className="mt-2 h-1 overflow-hidden rounded-full bg-white">
+                <div className="h-full rounded-full bg-amber-500" style={{ width: `${zone.assessment.landslideScore}%` }} />
+              </div>
             </div>
-
-            <div className="p-2.5 rounded-xl border border-stone-200/80 glass-card">
-              <span className="text-[10px] uppercase font-bold text-stone-500 block">
-                24h Accum.
-              </span>
-              <span className="text-base font-bold text-stone-900 font-mono">
-                {zone.weather.last24hMm.toFixed(1)}
-              </span>
-              <span className="text-[10px] text-stone-500 ml-0.5">mm</span>
+            <div title="Flash Flood Index, scored from 0 to 100" className="min-w-0 rounded-lg border border-orange-200 bg-orange-50/70 p-2">
+              <span className="block truncate text-[10px] font-semibold text-stone-700">Flash flood · FFI</span>
+              <strong className="mt-1 block font-mono text-lg leading-none text-stone-950">{zone.assessment.floodScore}<span className="text-[10px] text-stone-500">/100</span></strong>
+              <div className="mt-2 h-1 overflow-hidden rounded-full bg-white">
+                <div className="h-full rounded-full bg-orange-600" style={{ width: `${zone.assessment.floodScore}%` }} />
+              </div>
             </div>
-
-            <div className="p-2.5 rounded-xl border border-stone-200/80 glass-card">
-              <span className="text-[10px] uppercase font-bold text-stone-500 block">
-                72h Antecedent
-              </span>
-              <span className="text-base font-bold text-stone-900 font-mono">
-                {zone.weather.last72hMm.toFixed(1)}
-              </span>
-              <span className="text-[10px] text-stone-500 ml-0.5">mm</span>
+            <div title="XGBoost model estimate of flood risk" className="min-w-0 rounded-lg border border-cyan-200 bg-cyan-50/70 p-2">
+              <span className="block truncate text-[10px] font-semibold text-stone-700">XGBoost · flood</span>
+              <strong className="mt-1 block truncate font-mono text-lg leading-none text-stone-950">
+                {floodRiskModel ? `${floodRiskModel.riskPercent.toFixed(1)}%` : '—'}
+              </strong>
+              <div className="mt-2 h-1 overflow-hidden rounded-full bg-white">
+                {floodRiskModel && <div className="h-full rounded-full bg-cyan-700" style={{ width: `${floodRiskModel.riskPercent}%` }} />}
+              </div>
             </div>
           </div>
+        </section>
 
-          {/* Atmospheric readings returned by the configured weather provider */}
-          <div className="mt-2.5 p-3 rounded-xl border border-stone-200/80 glass-card text-xs">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[10px] uppercase font-bold text-stone-700 flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-ping inline-block" />
-                Weather Provider Readings
-              </span>
-              <span className="text-[10px] font-mono text-stone-500">
-                Lat: {zone.center[0].toFixed(2)}°, Lng: {zone.center[1].toFixed(2)}°
-              </span>
-            </div>
-            <div className="grid grid-cols-3 gap-2 text-stone-800">
-              <div className="bg-white/80 p-2 rounded-lg border border-stone-200/70 shadow-2xs">
-                <span className="text-[10px] text-stone-500 block font-medium">Ambient Temp</span>
-                <span className="font-bold text-stone-900 font-mono text-xs">
-                  {zone.weather.temperatureC != null ? `${zone.weather.temperatureC}°C` : 'Unavailable'}
-                </span>
+        <section aria-labelledby="precipitation-title" className="rounded-xl border border-stone-200 bg-white p-3.5 shadow-2xs">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex min-w-0 items-center gap-2">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-sky-100 text-sky-800">
+                <CloudRain className="h-4 w-4" />
               </div>
-              <div className="bg-white/80 p-2 rounded-lg border border-stone-200/70 shadow-2xs">
-                <span className="text-[10px] text-stone-500 block font-medium">Rel. Humidity</span>
-                <span className="font-bold text-stone-900 font-mono text-xs">
-                  {zone.weather.humidityPercent != null ? `${zone.weather.humidityPercent}%` : 'Unavailable'}
-                </span>
-              </div>
-              <div className="bg-white/80 p-2 rounded-lg border border-stone-200/70 shadow-2xs">
-                <span className="text-[10px] text-stone-500 block font-medium">Wind Speed</span>
-                <span className="font-bold text-stone-900 font-mono text-xs">
-                  {zone.weather.windSpeedKmh != null ? `${zone.weather.windSpeedKmh} km/h` : 'Unavailable'}
-                </span>
+              <div className="min-w-0">
+                <h3 id="precipitation-title" className="text-sm font-bold text-stone-900">Rain & weather</h3>
+                <p className="text-[10px] text-stone-500">{zone.weather.isLive ? 'Live conditions' : 'Scenario conditions'} · Updated {zone.weather.lastUpdated}</p>
               </div>
             </div>
-            {zone.weather.generationTimeMs != null && (
-              <div className="mt-2 flex items-center justify-between text-[10px] text-stone-500 pt-1.5 border-t border-stone-200/60">
-                <span>Source: Open-Meteo forecast API</span>
-                <span className="font-mono">Latency: {zone.weather.generationTimeMs}ms</span>
+          </div>
+
+          <div role="group" aria-label="Rain and weather view" className="mt-3 grid grid-cols-3 gap-1 rounded-lg bg-stone-100 p-1">
+            {([
+              { id: 'HISTORY', label: 'Past', icon: History },
+              { id: 'NOW', label: 'Now', icon: CloudSun },
+              { id: 'FORECAST', label: 'Forecast', icon: Calendar },
+            ] as const).map(({ id, label, icon: Icon }) => (
+              <button
+                key={id}
+                type="button"
+                aria-pressed={precipitationView === id}
+                onClick={() => setPrecipitationView(id)}
+                className={`flex min-h-9 items-center justify-center gap-1.5 rounded-md px-2 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-700 ${precipitationView === id ? 'bg-white text-sky-900 shadow-sm' : 'text-stone-600 hover:text-stone-900'}`}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                {label}
+              </button>
+            ))}
+          </div>
+
+          <div className="mt-3" aria-live="polite">
+            {precipitationView === 'HISTORY' && (
+              <div>
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <span className="text-xs font-semibold text-stone-800">Past 7 days</span>
+                  <span className="font-mono text-[11px] font-bold text-sky-800">{historyTotal.toFixed(1)} mm total</span>
+                </div>
+                {historyData.length ? (
+                  <div className="h-44 w-full" role="img" aria-label="Daily rainfall totals for the past seven days">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={historyData} margin={{ top: 10, right: 8, left: -20, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E7E5E4" />
+                        <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#78716C' }} />
+                        <YAxis tick={{ fontSize: 9, fill: '#78716C' }} unit="mm" />
+                        <Tooltip
+                          contentStyle={{ backgroundColor: '#FFFFFF', borderColor: '#E7E5E4', borderRadius: 8, fontSize: 11 }}
+                          formatter={(value: number | string | undefined) => [`${value ?? 0} mm`, 'Observed rain']}
+                        />
+                        <ReferenceLine y={50} stroke="#EA580C" strokeDasharray="3 3" />
+                        <Bar dataKey="rainfall" name="Rainfall" fill="#0284C7" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                ) : (
+                  <p className="rounded-lg bg-stone-50 px-3 py-5 text-center text-xs text-stone-600">Past rainfall history is unavailable.</p>
+                )}
+                <p className="mt-1 text-[10px] text-stone-500">Observed daily totals. The dashed line marks 50 mm.</p>
+              </div>
+            )}
+
+            {precipitationView === 'NOW' && (
+              <div>
+                <div className="flex items-center gap-3 rounded-lg bg-sky-50 p-3">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-sky-700">
+                    <CloudRain className="h-6 w-6" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-sky-900">Rain rate now</p>
+                    <p className="font-mono text-2xl font-bold leading-tight text-stone-950">{zone.weather.currentRateMmPerHour.toFixed(1)} <span className="text-xs font-semibold text-stone-600">mm/h</span></p>
+                    <p className="truncate text-[11px] text-stone-700">{zone.weather.weatherDescription}</p>
+                  </div>
+                </div>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <div className="flex items-center gap-2 rounded-lg border border-stone-200 px-2.5 py-2">
+                    <Droplets className="h-4 w-4 shrink-0 text-sky-700" />
+                    <span className="min-w-0 text-[10px] text-stone-600">Past 24h<strong className="block font-mono text-xs text-stone-900">{zone.weather.last24hMm.toFixed(1)} mm</strong></span>
+                  </div>
+                  <div className="flex items-center gap-2 rounded-lg border border-stone-200 px-2.5 py-2">
+                    <Droplets className="h-4 w-4 shrink-0 text-cyan-700" />
+                    <span className="min-w-0 text-[10px] text-stone-600">Past 72h<strong className="block font-mono text-xs text-stone-900">{zone.weather.last72hMm.toFixed(1)} mm</strong></span>
+                  </div>
+                  <div className="flex items-center gap-2 rounded-lg border border-stone-200 px-2.5 py-2">
+                    <Thermometer className="h-4 w-4 shrink-0 text-orange-600" />
+                    <span className="min-w-0 text-[10px] text-stone-600">Temperature<strong className="block font-mono text-xs text-stone-900">{zone.weather.temperatureC != null ? `${zone.weather.temperatureC}°C` : 'Unavailable'}</strong></span>
+                  </div>
+                  <div className="flex items-center gap-2 rounded-lg border border-stone-200 px-2.5 py-2">
+                    <Wind className="h-4 w-4 shrink-0 text-stone-600" />
+                    <span className="min-w-0 text-[10px] text-stone-600">Wind<strong className="block font-mono text-xs text-stone-900">{zone.weather.windSpeedKmh != null ? `${zone.weather.windSpeedKmh} km/h` : 'Unavailable'}</strong></span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {precipitationView === 'FORECAST' && (
+              <div>
+                <div className="flex items-center justify-between gap-3 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2.5">
+                  <div className="flex items-center gap-2">
+                    <CloudDrizzle className="h-5 w-5 text-sky-800" />
+                    <span className="text-xs font-semibold text-stone-800">Expected in next 24 hours</span>
+                  </div>
+                  <strong className="shrink-0 font-mono text-lg text-sky-900">{zone.weather.forecastNext24hMm.toFixed(1)} <span className="text-xs">mm</span></strong>
+                </div>
+                <div className="mt-3">
+                  <h4 className="mb-2 text-[11px] font-bold text-stone-800">Coming hours</h4>
+                  {hourlyForecast.length ? (
+                    <div className="flex gap-2 overflow-x-auto pb-2" aria-label="Hourly precipitation forecast">
+                      {hourlyForecast.map((hour, index) => (
+                        <div key={`${hour.time}-${index}`} className="min-w-[4.25rem] rounded-lg border border-stone-200 bg-white px-2 py-2 text-center">
+                          <span className="block text-[10px] font-semibold text-stone-600">{index === 0 ? 'Now' : hour.time}</span>
+                          {hour.probability >= 30 ? <CloudRain className="mx-auto my-1 h-4 w-4 text-sky-700" /> : <CloudDrizzle className="mx-auto my-1 h-4 w-4 text-stone-400" />}
+                          <strong className="block font-mono text-xs text-stone-900">{hour.precipitationMm.toFixed(1)} mm</strong>
+                          <span className="text-[9px] text-stone-500">{hour.probability}% chance</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="rounded-lg bg-stone-50 px-3 py-4 text-center text-xs text-stone-600">Hourly forecast is unavailable.</p>
+                  )}
+                </div>
+                {forecastDays.length > 0 && (
+                  <div className="mt-2 border-t border-stone-200 pt-2">
+                    <h4 className="mb-1 text-[11px] font-bold text-stone-800">Coming days</h4>
+                    <div className="divide-y divide-stone-100">
+                      {forecastDays.map((day) => (
+                        <div key={day.date} className="flex items-center gap-2 py-1.5 text-[11px]">
+                          <span className="w-14 shrink-0 text-stone-600">{day.date}</span>
+                          <CloudRain className="h-3.5 w-3.5 shrink-0 text-sky-700" />
+                          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-stone-100">
+                            <div className="h-full rounded-full bg-sky-500" style={{ width: `${Math.min(100, day.rainfallMm)}%` }} />
+                          </div>
+                          <strong className="w-12 shrink-0 text-right font-mono text-stone-900">{day.rainfallMm.toFixed(1)} mm</strong>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
-
-          <div className="mt-2 text-[11px] text-stone-700 bg-amber-50/70 border border-amber-200/60 rounded-xl px-3 py-2 flex items-center justify-between shadow-2xs">
-            <span className="font-medium text-stone-800">
-              Status: {zone.weather.weatherDescription}
-            </span>
-            <span className="text-stone-600 font-mono font-medium">
-              Fcst Next 24h: {zone.weather.forecastNext24hMm.toFixed(0)}mm
-            </span>
-          </div>
+          <p className="mt-2 border-t border-stone-100 pt-2 text-[10px] text-stone-500">Source: Open-Meteo · {zone.weather.isLive ? 'live weather data' : 'scenario preview'}</p>
         </section>
 
         {/* Hazard Breakdown: Landslide vs Flash Flood */}
@@ -243,7 +329,7 @@ export const ZoneDetailPanel: React.FC<ZoneDetailPanelProps> = ({
               />
             </div>
 
-            <div className="grid grid-cols-3 gap-1 text-[10px] text-stone-700 pt-1.5 border-t border-stone-200/60 font-mono">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 text-[10px] text-stone-700 pt-1.5 border-t border-stone-200/60 font-mono">
               <div>
                 <span className="text-stone-500 block">Slope Angle</span>
                 <span className="font-bold text-stone-900">{zone.slope}° (&times;{zone.assessment.landslideBreakdown.slopeMultiplier})</span>
@@ -293,22 +379,37 @@ export const ZoneDetailPanel: React.FC<ZoneDetailPanelProps> = ({
                 <span className="text-stone-500 block">Valley Funnel</span>
                 <span className="font-bold text-stone-900">&times;{zone.assessment.floodBreakdown.elevationFunnelMultiplier}</span>
               </div>
+              <div>
+                <span className="text-stone-500 block">River Flow</span>
+                <span className="font-bold text-stone-900">
+                  {zone.assessment.floodBreakdown.riverDischargeM3s != null
+                    ? `${zone.assessment.floodBreakdown.riverDischargeM3s.toLocaleString()} m³/s`
+                    : 'Unavailable'}
+                </span>
+                <span className="block text-stone-500">
+                  {zone.assessment.floodBreakdown.riverFlowRatio != null
+                    ? `Q/Q95 ${zone.assessment.floodBreakdown.riverFlowRatio.toFixed(2)}×`
+                    : 'No flow ratio'}
+                </span>
+              </div>
             </div>
           </div>
 
           <div className="p-3.5 rounded-xl border border-stone-200/80 glass-card">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-bold text-stone-900">XGBoost rainfall-risk proxy</span>
-              {floodRiskModel && (
+              <span className="text-xs font-bold text-stone-900">XGBoost flood-risk score</span>
+              {floodRiskModel ? (
                 <span className="text-xs font-bold text-stone-800">
-                  {floodRiskModel.riskPercent.toFixed(1)}% score
+                  {floodRiskModel.riskPercent.toFixed(1)}%
                 </span>
+              ) : (
+                <span className="text-xs font-bold text-stone-500">Not available</span>
               )}
             </div>
             <p className="text-[11px] text-stone-600 mt-1 leading-relaxed">
               {floodRiskModel
                 ? floodRiskModel.scoreMeaning
-                : 'Model score unavailable; the formula-based flood index is shown above.'}
+                : 'Score not available. Please wait a few seconds and try again.'}
             </p>
           </div>
 
@@ -338,10 +439,13 @@ export const ZoneDetailPanel: React.FC<ZoneDetailPanelProps> = ({
               <div>
                 <span className="font-sans font-bold text-stone-900 block mb-0.5">FFI Calculation:</span>
                 <p className="text-[11px] text-stone-700">
-                  (24h &times; 0.68 + Rate &times; 3.6) &times; RiverBuffer &times; Elevation &times; 0.40
+                  (24h &times; 0.68 + Rate &times; 3.6) &times; RiverBuffer &times; Elevation &times; FlowFactor &times; 0.40
                 </p>
                 <p className="text-[10px] text-orange-800 mt-1 font-sans">
-                  = ({zone.assessment.floodBreakdown.accumulation24h} + {zone.assessment.floodBreakdown.intensityFactor}) &times; {zone.assessment.floodBreakdown.riverProximityMultiplier} &times; {zone.assessment.floodBreakdown.elevationFunnelMultiplier} &times; 0.40 = <strong className="text-stone-900">{zone.assessment.floodScore}</strong>
+                  = ({zone.assessment.floodBreakdown.accumulation24h} + {zone.assessment.floodBreakdown.intensityFactor}) &times; {zone.assessment.floodBreakdown.riverProximityMultiplier} &times; {zone.assessment.floodBreakdown.elevationFunnelMultiplier} &times; {zone.assessment.floodBreakdown.riverFlowMultiplier} &times; 0.40 = <strong className="text-stone-900">{zone.assessment.floodScore}</strong>
+                </p>
+                <p className="text-[10px] text-stone-600 mt-1 font-sans">
+                  Flow factor = 1 + 0.5 &times; clamp(Q/Q95, 0, 2); Q95 is a historical high-flow reference, not a bankfull level.
                 </p>
               </div>
               <button
@@ -352,91 +456,6 @@ export const ZoneDetailPanel: React.FC<ZoneDetailPanelProps> = ({
               </button>
             </div>
           )}
-        </section>
-
-        {/* Historical & Forecast Charts (Recharts) */}
-        <section className="space-y-2.5">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-stone-700 flex items-center gap-1.5">
-              <Calendar className="w-3.5 h-3.5 text-orange-600" />
-              Precipitation History & Forecast
-            </span>
-            <div className="flex items-center gap-1 bg-stone-200/60 p-0.5 rounded-lg text-[11px] font-medium">
-              <button
-                onClick={() => setChartView('DAILY')}
-                className={`tactile-btn px-2.5 py-1 rounded-md transition cursor-pointer ${
-                  chartView === 'DAILY' ? 'bg-white text-stone-900 font-bold shadow-2xs' : 'text-stone-600'
-                }`}
-              >
-                7-Day / Daily
-              </button>
-              <button
-                onClick={() => setChartView('HOURLY')}
-                className={`tactile-btn px-2.5 py-1 rounded-md transition cursor-pointer ${
-                  chartView === 'HOURLY' ? 'bg-white text-stone-900 font-bold shadow-2xs' : 'text-stone-600'
-                }`}
-              >
-                24h Hourly
-              </button>
-            </div>
-          </div>
-
-          <div className="h-48 w-full glass-card rounded-xl p-3 border border-stone-200/80">
-            {chartView === 'DAILY' ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={dailyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E7E5E4" />
-                  <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#78716C' }} />
-                  <YAxis tick={{ fontSize: 10, fill: '#78716C' }} unit="mm" />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: '#FFFFFF',
-                      borderColor: '#E7E5E4',
-                      borderRadius: 10,
-                      fontSize: 11,
-                      boxShadow: '0 4px 16px rgba(0,0,0,0.08)',
-                    }}
-                    formatter={(val: number | string | undefined) => [`${val ?? 0} mm`, 'Rainfall']}
-                  />
-                  <ReferenceLine
-                    y={50}
-                    label={{ value: 'Warning 50mm', position: 'insideTopRight', fill: '#EA580C', fontSize: 9 }}
-                    stroke="#EA580C"
-                    strokeDasharray="3 3"
-                  />
-                  <Bar dataKey="rainfall" fill="#EA580C" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={hourlyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E7E5E4" />
-                  <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#78716C' }} />
-                  <YAxis tick={{ fontSize: 10, fill: '#78716C' }} unit="mm/h" />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: '#FFFFFF',
-                      borderColor: '#E7E5E4',
-                      borderRadius: 10,
-                      fontSize: 11,
-                      boxShadow: '0 4px 16px rgba(0,0,0,0.08)',
-                    }}
-                    formatter={(val: number | string | undefined) => [`${val ?? 0} mm/h`, 'Rate']}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="rate"
-                    stroke="#EA580C"
-                    strokeWidth={2}
-                    dot={{ fill: '#EA580C', r: 3 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            )}
-          </div>
-          <p className="text-[10px] text-stone-500 text-center font-medium">
-            Source: Live Open-Meteo precipitation models with historical past-days telemetry.
-          </p>
         </section>
 
         {/* Actionable Safety Protocol & Advisories */}
@@ -480,15 +499,15 @@ export const ZoneDetailPanel: React.FC<ZoneDetailPanelProps> = ({
           </div>
         </section>
 
-        {/* Simulate SMS Dispatch Button */}
+        {/* Alert Delivery Action */}
         <div className="pt-2">
           <button
             id="btn-simulate-zone-sms"
-            onClick={onOpenSmsSimulator}
+            onClick={onOpenAlertDelivery}
             className="tactile-btn w-full py-2.5 px-3 bg-gradient-to-r from-orange-500 via-orange-600 to-orange-700 hover:from-orange-600 hover:to-orange-800 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-md shadow-orange-500/20 border border-orange-400/30 transition cursor-pointer"
           >
             <Radio className="w-4 h-4" />
-            <span>Simulate Citizen SMS / Push Alert Broadcast</span>
+            <span>Open live alert delivery</span>
           </button>
         </div>
       </div>

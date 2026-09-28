@@ -12,7 +12,7 @@ from app.train_flood_data import build_flood_dataset
 
 
 def train(start: str = "2021-01-01", end: str = "2025-12-31") -> dict:
-    X, y, timestamps, zones = build_flood_dataset(start, end)
+    X, y, timestamps, zones, river_flow_thresholds = build_flood_dataset(start, end)
     order = np.argsort(np.array(timestamps))
     X, y = X[order], y[order]
     split = max(1, int(len(y) * 0.8))
@@ -52,14 +52,15 @@ def train(start: str = "2021-01-01", end: str = "2025-12-31") -> dict:
     model.save_model(FLOOD_MODEL_PATH)
     metadata = {
         "model": "XGBoost binary classifier",
-        "dataSource": "Open-Meteo Archive hourly precipitation plus static zone terrain/soil/exposure data",
-        "label": "rainfall_triggered_flood_risk_proxy",
-        "labelDefinition": "Broad next-24h rainfall threshold adjusted by river proximity; not an observed flood event label.",
-        "periodStart": start,
-        "periodEnd": end,
+        "dataSource": "Open-Meteo Archive hourly precipitation, GloFAS daily river discharge, and static zone terrain/soil/exposure data",
+        "label": "rainfall_or_high_river_flow_proxy",
+        "labelDefinition": "Positive when next-24h rainfall exceeds the zone threshold or next-day GloFAS discharge reaches that zone's historical 95th percentile; not an observed flood or bank-overflow label.",
+        "periodStart": min(timestamps)[:10],
+        "periodEnd": max(timestamps)[:10],
         "samples": int(len(y)),
         "zones": zones,
         "features": FLOOD_FEATURE_NAMES,
+        "riverFlowP95M3sByZone": river_flow_thresholds,
         "chronologicalHoldout": {
             "accuracy": round(accuracy, 3),
             "precision": round(precision, 3),

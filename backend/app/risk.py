@@ -34,7 +34,16 @@ def calculate_zone_risk(zone: dict, weather: dict) -> dict[str, Any]:
     river = max(0.1, float(zone["riverProximityKm"]))
     river_mult = round(max(0.6, 2.4 - river * 0.55), 2)
     elevation_factor = round(max(0.7, 2.0 - (min(float(zone["elevation"]), 1500) / 1200) * 0.85), 2)
-    raw_flood = (flood_acc + flood_int) * river_mult * elevation_factor * 0.40
+    river_data = weather.get("riverDischarge") or {}
+    current_discharge = river_data.get("currentM3s")
+    high_flow_threshold = river_data.get("highFlowThresholdM3s")
+    flow_ratio = (
+        float(current_discharge) / float(high_flow_threshold)
+        if current_discharge is not None and high_flow_threshold is not None and float(high_flow_threshold) > 0
+        else None
+    )
+    river_flow_factor = round(1.0 + 0.5 * min(2.0, max(0.0, flow_ratio)), 2) if flow_ratio is not None else 1.0
+    raw_flood = (flood_acc + flood_int) * river_mult * elevation_factor * river_flow_factor * 0.40
     flood_score = int(min(100, max(0, round(raw_flood))))
 
     higher, lower = max(landslide_score, flood_score), min(landslide_score, flood_score)
@@ -62,6 +71,9 @@ def calculate_zone_risk(zone: dict, weather: dict) -> dict[str, Any]:
         advisories.append(f"Slope instability along {zone['slope']}° terrain")
     if flood_score >= 60 and zone["riverProximityKm"] <= 0.5:
         advisories.append(f"Riparian surge within {zone['riverProximityKm']} km of {zone.get('riverName', 'channel')}")
+    if flow_ratio is not None and flow_ratio >= 1.0:
+        advisories.append(f"GloFAS discharge reached {flow_ratio:.1f}x the local high-flow reference")
+        thresholds.append("Daily river discharge >= local historical 95th percentile")
     if not advisories:
         advisories.append("Catchment drainage within baseline capacity")
 
@@ -92,6 +104,10 @@ def calculate_zone_risk(zone: dict, weather: dict) -> dict[str, Any]:
             "intensityFactor": round(flood_int, 1),
             "riverProximityMultiplier": river_mult,
             "elevationFunnelMultiplier": elevation_factor,
+            "riverFlowMultiplier": river_flow_factor,
+            "riverFlowRatio": round(flow_ratio, 2) if flow_ratio is not None else None,
+            "riverDischargeM3s": round(float(current_discharge), 1) if current_discharge is not None else None,
+            "riverHighFlowThresholdM3s": round(float(high_flow_threshold), 1) if high_flow_threshold is not None else None,
             "rawScore": round(raw_flood, 1),
         },
         "activeAdvisories": advisories,

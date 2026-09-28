@@ -1,12 +1,13 @@
 import React from 'react';
-import { X, ShieldAlert, CheckCircle, ChevronRight, Mountain, Waves, CloudRain } from 'lucide-react';
-import { EarlyWarningAlert, ZoneWithTelemetry } from '../types';
+import { X, ShieldAlert, CheckCircle, ChevronRight, FlaskConical } from 'lucide-react';
+import { EarlyWarningAlert } from '../types';
 import { RISK_PALETTE } from '../utils/riskEngine';
 
 interface AlertsDrawerModalProps {
   isOpen: boolean;
   onClose: () => void;
   alerts: EarlyWarningAlert[];
+  simulationAlerts: EarlyWarningAlert[];
   onSelectZoneById: (zoneId: string) => void;
   onAcknowledgeAlert: (alertId: string) => void;
 }
@@ -15,6 +16,7 @@ export const AlertsDrawerModal: React.FC<AlertsDrawerModalProps> = ({
   isOpen,
   onClose,
   alerts,
+  simulationAlerts,
   onSelectZoneById,
   onAcknowledgeAlert,
 }) => {
@@ -33,10 +35,10 @@ export const AlertsDrawerModal: React.FC<AlertsDrawerModalProps> = ({
             </div>
             <div>
               <h3 className="text-sm font-bold text-stone-900">
-                Active Early Warning Advisories ({alerts.length})
+                Alerts ({alerts.length + simulationAlerts.length})
               </h3>
               <p className="text-[11px] text-stone-500 font-medium">
-                Sectors currently exceeding hydrological safety thresholds
+                Live warnings and separate simulation-only previews
               </p>
             </div>
           </div>
@@ -49,6 +51,9 @@ export const AlertsDrawerModal: React.FC<AlertsDrawerModalProps> = ({
         </div>
 
         <div className="p-4 overflow-y-auto space-y-3 flex-1 text-xs">
+          <div className="mb-2 flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-stone-600">
+            <ShieldAlert className="h-3.5 w-3.5" /> Live alerts ({alerts.length})
+          </div>
           {alerts.length === 0 ? (
             <div className="text-center py-10 text-stone-600 glass-card rounded-xl border border-stone-200/80 p-5 shadow-2xs">
               <CheckCircle className="w-9 h-9 text-amber-500 mx-auto mb-2 opacity-90" />
@@ -117,6 +122,31 @@ export const AlertsDrawerModal: React.FC<AlertsDrawerModalProps> = ({
               );
             })
           )}
+
+          <section className="border-t border-stone-200 pt-3" aria-label="Simulation-only alerts">
+            <div className="mb-2 flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-sky-900">
+              <FlaskConical className="h-3.5 w-3.5" /> Simulation only ({simulationAlerts.length})
+            </div>
+            {simulationAlerts.length === 0 ? (
+              <p className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-2.5 text-[11px] leading-relaxed text-sky-950">
+                No simulated high or severe alerts. Adjust the scenario in Simulation to preview possible alerts.
+              </p>
+            ) : simulationAlerts.map((alert) => {
+              const palette = RISK_PALETTE[alert.level];
+              return (
+                <article key={alert.id} className="mb-2 rounded-xl border border-sky-200 bg-sky-50 p-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded border border-sky-300 bg-white px-2 py-0.5 text-[10px] font-bold uppercase text-sky-900">Simulation only</span>
+                    <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase ${palette.badgeBg} ${palette.badgeText} ${palette.badgeBorder}`}>{alert.level} hazard</span>
+                    <span className="text-xs font-bold text-stone-900">{alert.zoneName}</span>
+                  </div>
+                  <p className="mt-2 text-xs font-semibold leading-snug text-stone-900">{alert.headline}</p>
+                  <p className="mt-1 text-[11px] leading-relaxed text-stone-700">{alert.recommendation}</p>
+                  <p className="mt-2 text-[10px] font-medium text-sky-900">Preview only. This is not a live warning and cannot be delivered.</p>
+                </article>
+              );
+            })}
+          </section>
         </div>
 
         <div className="p-3 border-t border-stone-200/80 bg-stone-50/70 flex justify-end">
