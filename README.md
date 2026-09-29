@@ -46,6 +46,24 @@ The frontend uses `http://127.0.0.1:8000` by default. To use another API address
 VITE_BACKEND_URL=http://127.0.0.1:8000
 ```
 
+## PostgreSQL and PostGIS
+
+SQLite remains the default for local development. For a shared deployment, set `DATABASE_URL` to a PostgreSQL connection URL, for example `postgresql+psycopg://user:password@host:5432/jalrakshak`. Standard `postgresql://` and `postgres://` URLs are normalized to the installed psycopg 3 driver.
+
+Migration `0003` creates a shared monitoring-zone catalog. PostgreSQL deployments additionally store zone centers as PostGIS geography and zone boundaries as SRID 4326 multipolygons, with GiST indexes for spatial queries. PostGIS must be installed on the database server; the migration enables the extension, so the database role needs permission to create it (or an administrator must enable it in advance).
+
+`GET /api/zones/nearby?lat=26.18&lng=91.75&radius_km=25` returns monitoring zones ordered by distance. PostgreSQL uses PostGIS `ST_DWithin`/`ST_Distance`; local SQLite uses a Haversine fallback. API startup synchronizes the zone catalog from the application configuration.
+
+For a multi-replica deployment, run the migration once as a release step, then disable startup migrations on each API replica:
+
+```powershell
+$env:DATABASE_URL = "postgresql+psycopg://user:password@host:5432/jalrakshak"
+alembic -c backend/alembic.ini upgrade head
+$env:AUTO_MIGRATE_DATABASE = "false"
+```
+
+Local development still applies migrations automatically. Create a new Alembic revision for each future schema change; do not edit a revision already applied to a shared database.
+
 For production, configure the frontend API address and backend CORS allowlist in your hosting settings. When the frontend and API share an origin, route `/api` to the backend. Include the XGBoost model artifacts in the backend deployment; the browser-only fallback does not include its score.
 
 ## Main features
