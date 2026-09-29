@@ -21,12 +21,14 @@ from pydantic import BaseModel, Field
 
 from app.database import (
     check_database,
+    find_nearby_zones,
     get_assessment_history,
     get_model_runs,
     get_training_labels,
     initialize_database,
     record_assessments,
     record_training_label,
+    sync_monitoring_zones,
 )
 from app.flood_xgboost import FLOOD_MODEL
 from app.fusion import fuse_zone
@@ -50,6 +52,7 @@ TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN", "").strip()
 TWILIO_FROM_NUMBER = os.getenv("TWILIO_FROM_NUMBER", "").strip()
 ALERT_SMS_TO = os.getenv("ALERT_SMS_TO", "").strip()
 DATA_INGEST_TOKEN = os.getenv("DATA_INGEST_TOKEN", "")
+AUTO_MIGRATE_DATABASE = os.getenv("AUTO_MIGRATE_DATABASE", "true").strip().lower() in {"1", "true", "yes"}
 CORS_ALLOWED_ORIGINS = [
     origin.strip()
     for origin in os.getenv("CORS_ALLOWED_ORIGINS", "").split(",")
@@ -80,7 +83,11 @@ class TrainingLabelRequest(BaseModel):
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    await asyncio.to_thread(initialize_database)
+    if AUTO_MIGRATE_DATABASE:
+        await asyncio.to_thread(initialize_database)
+    else:
+        await asyncio.to_thread(check_database)
+    await asyncio.to_thread(sync_monitoring_zones, ZONES)
     yield
 
 
@@ -284,6 +291,17 @@ async def deliver_alert(alert: AlertDeliveryRequest) -> dict[str, Any]:
 @app.get("/api/zones")
 async def zones() -> dict[str, Any]:
     return {"zones": ZONES}
+
+
+@app.get("/api/zones/nearby")
+async def nearby_zones(
+    lat: float = Query(ge=-90, le=90),
+    lng: float = Query(ge=-180, le=180),
+    radius_km: float = Query(25, gt=0, le=500),
+    limit: int = Query(10, ge=1, le=100),
+) -> dict[str, Any]:
+    matches = await asyncio.to_thread(find_nearby_zones, lat, lng, radius_km, limit)
+    return {"zones": matches, "count": len(matches), "radiusKm": radius_km}
 
 
 @app.get("/api/dashboard")

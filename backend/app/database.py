@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import math
 import os
 from datetime import datetime, timezone
 from pathlib import Path
@@ -8,6 +10,8 @@ from typing import Any
 from alembic import command
 from alembic.config import Config
 from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Index, Integer, JSON, String, URL, create_engine, inspect, select, text
+from sqlalchemy.dialects.postgresql import insert as postgresql_insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, relationship
 
 from app.config import DATA_DIR
@@ -86,9 +90,27 @@ class ModelRun(Base):
     metrics_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
 
 
+class MonitoringZone(Base):
+    __tablename__ = "monitoring_zones"
+
+    zone_id: Mapped[str] = mapped_column(String(120), primary_key=True)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    region: Mapped[str] = mapped_column(String(200), nullable=False)
+    center_latitude: Mapped[float] = mapped_column(Float, nullable=False)
+    center_longitude: Mapped[float] = mapped_column(Float, nullable=False)
+    polygon_json: Mapped[list[list[float]]] = mapped_column(JSON, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc)
+    )
+
+
 def _make_engine():
     database_url = os.getenv("DATABASE_URL", "").strip()
     if database_url:
+        if database_url.startswith("postgres://"):
+            database_url = "postgresql+psycopg://" + database_url.removeprefix("postgres://")
+        elif database_url.startswith("postgresql://"):
+            database_url = "postgresql+psycopg://" + database_url.removeprefix("postgresql://")
         engine_url = database_url
     else:
         DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -113,7 +135,103 @@ def initialize_database() -> None:
 
 def check_database() -> None:
     with engine.connect() as connection:
-        connection.execute(text("SELECT 1"))
+        connection.execute(text("SELECT version_num FROM alembic_version LIMIT 1"))
+
+
+def sync_monitoring_zones(zones: list[dict[str, Any]]) -> None:
+    with Session(engine) as session:
+        for zone in zones:
+            latitude, longitude = zone["center"]
+            values = {
+                "zone_id": zone["id"],
+                "name": zone["name"],
+                "region": zone["region"],
+                "center_latitude": float(latitude),
+                "center_longitude": float(longitude),
+                "polygon_json": zone["polygon"],
+                "updated_at": datetime.now(timezone.utc),
+            }
+            insert_factory = postgresql_insert if engine.dialect.name == "postgresql" else sqlite_insert
+            statement = insert_factory(MonitoringZone).values(**values)
+            session.execute(statement.on_conflict_do_update(
+                index_elements=[MonitoringZone.zone_id],
+                set_={key: getattr(statement.excluded, key) for key in values if key != "zone_id"},
+            ))
+
+            if engine.dialect.name == "postgresql":
+                ring = [[float(point[1]), float(point[0])] for point in zone["polygon"]]
+                if ring[0] != ring[-1]:
+                    ring.append(ring[0])
+                polygon = json.dumps({"type": "Polygon", "coordinates": [ring]})
+                session.execute(
+                    text("""
+                        UPDATE monitoring_zones
+                        SET center_geog = ST_SetSRID(ST_MakePoint(:longitude, :latitude), 4326)::geography,
+                            boundary_geom = ST_Multi(ST_SetSRID(ST_GeomFromGeoJSON(:polygon), 4326))
+                        WHERE zone_id = :zone_id
+                    """),
+                    {
+                        "longitude": float(longitude),
+                        "latitude": float(latitude),
+                        "polygon": polygon,
+                        "zone_id": zone["id"],
+                    },
+                )
+        session.commit()
+
+
+def find_nearby_zones(latitude: float, longitude: float, radius_km: float, limit: int) -> list[dict[str, Any]]:
+    with Session(engine) as session:
+        if engine.dialect.name == "postgresql":
+            rows = session.execute(
+                text("""
+                    SELECT zone_id, name, region,
+                        ST_Distance(
+                            center_geog,
+                            ST_SetSRID(ST_MakePoint(:longitude, :latitude), 4326)::geography
+                        ) / 1000.0 AS distance_km
+                    FROM monitoring_zones
+                    WHERE ST_DWithin(
+                        center_geog,
+                        ST_SetSRID(ST_MakePoint(:longitude, :latitude), 4326)::geography,
+                        :radius_m
+                    )
+                    ORDER BY distance_km
+                    LIMIT :limit
+                """),
+                {
+                    "latitude": latitude,
+                    "longitude": longitude,
+                    "radius_m": radius_km * 1000,
+                    "limit": limit,
+                },
+            ).mappings().all()
+            return [
+                {
+                    "id": row["zone_id"],
+                    "name": row["name"],
+                    "region": row["region"],
+                    "distanceKm": round(float(row["distance_km"]), 2),
+                }
+                for row in rows
+            ]
+
+        zones = session.scalars(select(MonitoringZone)).all()
+    nearby = []
+    for zone in zones:
+        lat1, lat2 = math.radians(latitude), math.radians(zone.center_latitude)
+        delta_lat = lat2 - lat1
+        delta_lon = math.radians(zone.center_longitude - longitude)
+        haversine = math.sin(delta_lat / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin(delta_lon / 2) ** 2
+        distance_km = 6371.0088 * 2 * math.asin(math.sqrt(haversine))
+        if distance_km <= radius_km:
+            nearby.append({
+                "id": zone.zone_id,
+                "name": zone.name,
+                "region": zone.region,
+                "distanceKm": round(distance_km, 2),
+            })
+    return sorted(nearby, key=lambda zone: zone["distanceKm"])[:limit]
 
 
 def record_assessments(zones: list[dict[str, Any]], scenario: str, observed_at: str) -> None:
