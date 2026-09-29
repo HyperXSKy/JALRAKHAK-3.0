@@ -11,7 +11,10 @@ export interface BackendDashboardResponse {
   cache: 'hit' | 'miss';
 }
 
-const BACKEND_BASE_URL = (import.meta.env.VITE_BACKEND_URL || 'http://127.0.0.1:8000').replace(/\/$/, '');
+const BACKEND_BASE_URL = (
+  import.meta.env.VITE_BACKEND_URL ||
+  (import.meta.env.DEV ? 'http://127.0.0.1:8000' : window.location.origin)
+).replace(/\/$/, '');
 const BACKEND_REQUEST_TIMEOUT_MS = 12000;
 const inFlightRequests = new Map<SimulationScenario, Promise<BackendDashboardResponse>>();
 

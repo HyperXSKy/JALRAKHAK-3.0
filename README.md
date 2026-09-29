@@ -46,6 +46,8 @@ The frontend uses `http://127.0.0.1:8000` by default. To use another API address
 VITE_BACKEND_URL=http://127.0.0.1:8000
 ```
 
+For production, configure the frontend API address and backend CORS allowlist in your hosting settings. When the frontend and API share an origin, route `/api` to the backend. Include the XGBoost model artifacts in the backend deployment; the browser-only fallback does not include its score.
+
 ## Main features
 
 - Live rainfall and forecast data from Open-Meteo.
@@ -62,7 +64,7 @@ VITE_BACKEND_URL=http://127.0.0.1:8000
 
 The Alerts page supports delivery of live advisories through configured webhook, email, or SMS channels. Available channels are shown in the application after the server is configured. Operators can send a test notification or deliver an active advisory from the Alerts page.
 
-Simulation alerts are previews only and cannot be delivered. Delivery settings and credentials stay on the server and should not be committed to the repository.
+Simulation alerts are previews only and cannot be delivered. Store credentials and tokens in your hosting provider's secret settings, not in this README or committed source files.
 
 ## Data and model limitations
 
