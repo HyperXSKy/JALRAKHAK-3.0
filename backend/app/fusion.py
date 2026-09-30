@@ -35,16 +35,13 @@ def _source(id_: str, label: str, value: float, horizon: str, mode: str, model: 
 async def fuse_zone(zone: dict, scenario: str = "LIVE") -> dict[str, Any]:
     lat, lng = zone["center"]
     live = scenario == "LIVE"
-    obs = nwp_gfs = nwp_ecmwf = nwp_icon = None
+    obs = None
     glofas = None
     fetch_errors: list[str] = []
 
     if live:
         tasks = {
             "obs": fetch_model_forecast(lat, lng, None),
-            "gfs": fetch_model_forecast(lat, lng, "gfs_seamless"),
-            "ecmwf": fetch_model_forecast(lat, lng, "ecmwf_ifs025"),
-            "icon": fetch_model_forecast(lat, lng, "icon_seamless"),
             "glofas": fetch_glofas_discharge(lat, lng),
         }
         keys = list(tasks.keys())
@@ -55,12 +52,6 @@ async def fuse_zone(zone: dict, scenario: str = "LIVE") -> dict[str, Any]:
                 fetch_errors.append(f"{key}: {val.__class__.__name__}")
             elif key == "obs":
                 obs = val
-            elif key == "gfs":
-                nwp_gfs = val
-            elif key == "ecmwf":
-                nwp_ecmwf = val
-            elif key == "icon":
-                nwp_icon = val
             elif key == "glofas":
                 glofas = val
 
@@ -88,23 +79,12 @@ async def fuse_zone(zone: dict, scenario: str = "LIVE") -> dict[str, Any]:
         else:
             obs = scenario_weather(zone, scenario)
 
-    gfs24 = (nwp_gfs or obs).get("forecastNext24hMm", obs["forecastNext24hMm"])
-    ecm24 = (nwp_ecmwf or obs).get("forecastNext24hMm", obs["forecastNext24hMm"])
-    icon24 = (nwp_icon or obs).get("forecastNext24hMm", obs["forecastNext24hMm"])
-    nwp_mean_24 = round((gfs24 + ecm24 + icon24) / 3.0, 1)
-    nwp_3h = round(
-        (
-            (nwp_gfs or obs).get("forecastNext3hMm", 0)
-            + (nwp_ecmwf or obs).get("forecastNext3hMm", 0)
-            + (nwp_icon or obs).get("forecastNext3hMm", 0)
-        )
-        / 3.0,
-        1,
-    )
+    forecast_24 = float(obs.get("forecastNext24hMm", 0))
+    nwp_3h = float(obs.get("forecastNext3hMm", 0))
 
     # Use the live forecast field directly; satellite imagery is not connected.
     sat_rate = round(obs["currentRateMmPerHour"], 1)
-    sat_24 = round((icon24 * 0.6 + obs["last24hMm"] * 0.4), 1)
+    sat_24 = round((forecast_24 * 0.6 + obs["last24hMm"] * 0.4), 1)
 
     # Radar-style nowcast proxy: persistence of recent hourly rain (not IMD DWR).
     hourly = obs.get("hourlyForecast") or []
@@ -114,7 +94,7 @@ async def fuse_zone(zone: dict, scenario: str = "LIVE") -> dict[str, Any]:
     mode_obs = "live" if obs.get("isLive") else ("simulated" if scenario not in ("LIVE",) else "unavailable")
     sat_mode = "live_proxy" if live and obs.get("isLive") else ("hindcast" if scenario == "HINDCAST" else ("simulated" if not live else "unavailable"))
     radar_mode = sat_mode
-    nwp_mode = "live" if any((nwp_gfs, nwp_ecmwf, nwp_icon)) else mode_obs
+    nwp_mode = mode_obs
 
     sources = [
         _source(
@@ -147,7 +127,7 @@ async def fuse_zone(zone: dict, scenario: str = "LIVE") -> dict[str, Any]:
         _source(
             "nwp",
             "Open-Meteo forecast",
-            nwp_mean_24,
+            forecast_24,
             "next 24h",
             nwp_mode,
             "Open-Meteo best_match forecast field",
@@ -162,7 +142,7 @@ async def fuse_zone(zone: dict, scenario: str = "LIVE") -> dict[str, Any]:
             "sat_rate": sat_rate,
             "radar_nowcast": radar_rate,
             "nwp_3h": nwp_3h,
-            "nwp_24h": nwp_mean_24,
+            "nwp_24h": forecast_24,
             "humidity": humidity,
             "antecedent_72h": obs["last72hMm"],
             "hour": datetime.now().hour,
@@ -172,17 +152,16 @@ async def fuse_zone(zone: dict, scenario: str = "LIVE") -> dict[str, Any]:
     )
     nowcast_6h = round(nowcast_3h * 1.65, 1)
     peak_rate = round(max(obs["currentRateMmPerHour"], radar_rate, nowcast_3h / 3 * 1.2), 1)
-    blended_24 = round(0.35 * obs["last24hMm"] + 0.2 * sat_24 + 0.45 * nwp_mean_24, 1)
+    blended_24 = round(0.35 * obs["last24hMm"] + 0.2 * sat_24 + 0.45 * forecast_24, 1)
     color = imd_color(max(blended_24, obs["last24hMm"] + nowcast_3h), peak_rate)
 
-    disagreement = abs(gfs24 - ecm24) + abs(ecm24 - icon24)
-    confidence = max(0.35, min(0.92, 0.88 - disagreement / 180.0))
+    confidence = 0.55 if obs.get("isLive") else 0.35
 
     weather = {
         "currentRateMmPerHour": obs["currentRateMmPerHour"],
         "last24hMm": obs["last24hMm"],
         "last72hMm": obs["last72hMm"],
-        "forecastNext24hMm": nwp_mean_24,
+        "forecastNext24hMm": forecast_24,
         "hourlyForecast": hourly,
         "dailyHistory": obs.get("dailyHistory") or [],
         "lastUpdated": datetime.now(timezone.utc).strftime("%H:%M:%S UTC"),
@@ -207,12 +186,10 @@ async def fuse_zone(zone: dict, scenario: str = "LIVE") -> dict[str, Any]:
         "imdColor": color,
         "leadTimeHours": 3 if color in ("ORANGE", "RED") else 6,
         "confidence": round(confidence, 2),
-            "method": "ridge blend of Open-Meteo observation + forecast + rainfall persistence",
+        "method": "ridge blend of Open-Meteo observation + forecast + rainfall persistence",
         "modelMetrics": MODEL.metrics,
         "nwpMembers": {
-            "gfs24hMm": gfs24,
-            "ecmwf24hMm": ecm24,
-            "icon24hMm": icon24,
+            "bestMatch24hMm": forecast_24,
         },
     }
 
