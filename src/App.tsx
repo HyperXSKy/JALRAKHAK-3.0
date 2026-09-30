@@ -8,6 +8,7 @@ import {
   HLSInundationScreenResponse,
 } from './services/backend';
 import { calculateZoneRisk, generateZoneAlert, calculateDistanceKm } from './utils/riskEngine';
+import { predictFloodRiskModel } from './services/floodRiskModel';
 import { TopNav } from './components/TopNav';
 import { AlertBanner } from './components/AlertBanner';
 import { SidebarZoneList } from './components/SidebarZoneList';
@@ -55,7 +56,16 @@ function fetchBrowserFallbackZones(scenario: SimulationScenario): Promise<ZoneWi
   const request = Promise.allSettled(
     MONITORING_ZONES.map(async (zone) => {
       const weather = await fetchZoneWeather(zone, scenario);
-      return { ...zone, weather, assessment: calculateZoneRisk(zone, weather) };
+      const assessment = calculateZoneRisk(zone, weather);
+      const floodRiskModel = predictFloodRiskModel(zone, weather);
+      return {
+        ...zone,
+        weather,
+        assessment,
+        fusion: {
+          floodRiskModel,
+        },
+      };
     })
   ).then((results) =>
     results.flatMap((result) => (result.status === 'fulfilled' ? [result.value] : []))
